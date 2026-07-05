@@ -9,6 +9,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/orders', icon: ClipboardList, label: 'Semua Orderan' },
   { to: '/orders/new', icon: PlusCircle, label: 'Tambah Orderan' },
+  { to: '/mockup', icon: Layers, label: 'Mockup Studio' },
   { to: '/drive', icon: FolderOpen, label: 'Drive Manager' },
   { to: '/reports', icon: BarChart2, label: 'Laporan' },
 ]
