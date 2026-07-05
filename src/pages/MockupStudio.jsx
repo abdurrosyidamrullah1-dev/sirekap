@@ -9,7 +9,7 @@ const TEMPLATES = [
   { id: 'idcard', name: 'ID Card', icon: CreditCard, ratio: 54/86 }, // ISO ID card
   { id: 'businesscard', name: 'Kartu Nama', icon: CreditCard, ratio: 90/55 },
   { id: 'smartphone', name: 'Layar HP', icon: Smartphone, ratio: 9/19.5 },
-  { id: 'pen', name: 'Pulpen', icon: PenTool, ratio: 40/220 },
+  { id: 'pen', name: 'Pulpen', icon: PenTool, ratio: 60/260 },
 ]
 
 export default function MockupStudio() {
@@ -144,38 +144,38 @@ export default function MockupStudio() {
 
     if (template === 'pen') {
       return (
-        <div style={{ ...baseStyle, width: 120, height: 500, background: 'transparent', boxShadow: 'none', overflow: 'visible', flexDirection: 'column', justifyContent: 'flex-start' }}>
-          {/* Clicker (Top) */}
-          <div style={{ width: 16, height: 20, background: 'linear-gradient(to right, #94a3b8, #f1f5f9, #94a3b8)', borderRadius: '4px 4px 0 0', zIndex: 10, margin: '0 auto' }} />
+        <div style={{ ...baseStyle, width: 160, height: 600, background: 'transparent', boxShadow: 'none', overflow: 'visible', flexDirection: 'column', justifyContent: 'flex-start', paddingTop: 20 }}>
           
-          {/* Black Top Cap */}
-          <div style={{ width: 40, height: 35, background: 'linear-gradient(to right, #0f172a, #334155, #0f172a)', borderRadius: '4px 4px 0 0', zIndex: 11, margin: '0 auto', position: 'relative' }}>
-            {/* Clip (Side) attached to Top Cap */}
-            <div style={{ position: 'absolute', top: 10, left: -10, width: 14, height: 120, background: 'linear-gradient(to right, #0f172a, #334155)', borderRadius: '6px 0 0 12px', zIndex: 12, borderRight: '2px solid #0f172a', boxShadow: '-2px 2px 5px rgba(0,0,0,0.2)' }} />
+          {/* Clicker (Silver Top) */}
+          <div style={{ width: 22, height: 28, background: 'linear-gradient(to right, #64748b, #e2e8f0, #475569)', borderRadius: '6px 6px 0 0', zIndex: 10, margin: '0 auto', boxShadow: 'inset 0 4px 6px rgba(255,255,255,0.8)' }} />
+          
+          {/* Black Top Cap & Clip */}
+          <div style={{ width: 60, height: 45, background: 'linear-gradient(to right, #020617, #1e293b, #020617)', borderRadius: '16px 16px 0 0', zIndex: 11, margin: '0 auto', position: 'relative' }}>
+            {/* The Clip */}
+            <div style={{ position: 'absolute', top: 12, left: -14, width: 20, height: 160, background: 'linear-gradient(to right, #020617, #334155, #0f172a)', borderRadius: '8px 0 50% 12px', zIndex: 12, borderRight: '2px solid #020617', boxShadow: '-5px 10px 15px rgba(0,0,0,0.4)' }} />
           </div>
           
           {/* Main Body (Design Area) */}
-          <div style={{ width: 40, height: 220, background: '#fff', position: 'relative', overflow: 'hidden', zIndex: 10, margin: '0 auto' }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(0,0,0,0.15) 0%, rgba(255,255,255,0.6) 30%, rgba(0,0,0,0.15) 100%)', zIndex: 15, pointerEvents: 'none' }} />
+          <div style={{ width: 60, height: 260, background: '#fff', position: 'relative', overflow: 'hidden', zIndex: 10, margin: '0 auto' }}>
+            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(0,0,0,0.35) 0%, rgba(255,255,255,0.8) 30%, rgba(0,0,0,0.05) 70%, rgba(0,0,0,0.45) 100%)', zIndex: 15, pointerEvents: 'none' }} />
             {designLayer}
           </div>
 
-          {/* Grip (Bottom of Body) */}
-          <div style={{ width: 40, height: 70, background: 'linear-gradient(to right, #0f172a, #334155, #0f172a)', zIndex: 11, margin: '0 auto', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-evenly', padding: '8px 0', borderBottomLeftRadius: 12, borderBottomRightRadius: 12 }}>
-            {/* Ribbed texture */}
-            {Array.from({length: 6}).map((_, i) => (
-              <div key={i} style={{ width: '100%', height: 3, background: '#020617', opacity: 0.6 }} />
+          {/* Grip (Black Ribbed) */}
+          <div style={{ width: 60, height: 110, background: 'linear-gradient(to right, #020617, #1e293b, #020617)', zIndex: 11, margin: '0 auto', position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6, padding: '15px 0', borderBottomLeftRadius: '15px 80px', borderBottomRightRadius: '15px 80px' }}>
+            {Array.from({length: 8}).map((_, i) => (
+              <div key={i} style={{ width: '100%', height: 4, background: 'rgba(0,0,0,0.8)', borderBottom: '1px solid rgba(255,255,255,0.1)' }} />
             ))}
           </div>
 
-          {/* Tip (Silver Cone) */}
-          <div style={{ width: 36, height: 45, background: 'linear-gradient(to right, #94a3b8, #f1f5f9, #94a3b8)', clipPath: 'polygon(0 0, 100% 0, 60% 100%, 40% 100%)', zIndex: 10, margin: '0 auto' }} />
+          {/* Silver Tip Base */}
+          <div style={{ width: 30, height: 40, background: 'linear-gradient(to right, #64748b, #e2e8f0, #475569)', clipPath: 'polygon(0 0, 100% 0, 70% 100%, 30% 100%)', zIndex: 10, margin: '0 auto' }} />
           
           {/* Pen Point */}
-          <div style={{ width: 6, height: 12, background: 'linear-gradient(to right, #64748b, #94a3b8)', borderRadius: '0 0 4px 4px', zIndex: 9, margin: '0 auto' }} />
+          <div style={{ width: 8, height: 16, background: 'linear-gradient(to right, #475569, #cbd5e1, #334155)', borderRadius: '0 0 6px 6px', zIndex: 9, margin: '0 auto' }} />
           
-          {/* Shadow at bottom */}
-          <div style={{ width: 60, height: 12, background: 'rgba(0,0,0,0.15)', borderRadius: '50%', filter: 'blur(4px)', zIndex: 5, margin: '5px auto 0' }} />
+          {/* Shadow below pen */}
+          <div style={{ width: 80, height: 15, background: 'rgba(0,0,0,0.2)', borderRadius: '50%', filter: 'blur(5px)', zIndex: 5, margin: '8px auto 0' }} />
         </div>
       )
     }
