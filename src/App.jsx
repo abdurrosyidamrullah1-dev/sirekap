@@ -9,7 +9,7 @@ import OrderForm from './pages/OrderForm'
 import OrderDetail from './pages/OrderDetail'
 import Reports from './pages/Reports'
 import DriveManager from './pages/DriveManager'
-import MockupStudio from './pages/MockupStudio'
+import AiAssistant from './pages/AiAssistant'
 import { initGoogleAPI } from './lib/drive'
 import './index.css'
 
@@ -24,7 +24,7 @@ function AnimatedRoutes() {
         <Route path="/orders/:id"   element={<OrderDetail />} />
         <Route path="/drive"        element={<DriveManager />} />
         <Route path="/reports"      element={<Reports />} />
-        <Route path="/mockup"       element={<MockupStudio />} />
+        <Route path="/ai"           element={<AiAssistant />} />
       </Routes>
     </AnimatePresence>
   )
