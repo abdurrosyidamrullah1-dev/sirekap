@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import {
   getOrderById, updateOrder, updateOrderItem, deleteOrderItem,
-  addOrderItem, getStatusConfig, ORDER_STATUSES
+  addOrderItem, getStatusConfig, ORDER_STATUSES, supabase
 } from '../lib/supabase'
 import FileManager from '../components/FileManager'
 import WorkflowTracker from '../components/WorkflowTracker'
@@ -56,7 +56,23 @@ export default function OrderDetail() {
     }
   }
 
-  useEffect(() => { load() }, [id])
+  useEffect(() => {
+    load()
+
+    const channel = supabase
+      .channel(`public:orders:${id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => {
+        load()
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${id}` }, () => {
+        load()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [id])
 
   const handleSaveOrder = async () => {
     setSaving(true)

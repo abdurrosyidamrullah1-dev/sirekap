@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, PlusCircle, ClipboardList, Filter } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getOrders, deleteOrder } from '../lib/supabase'
+import { getOrders, deleteOrder, supabase } from '../lib/supabase'
 import OrderCard from '../components/OrderCard'
 import toast from 'react-hot-toast'
 
@@ -38,7 +38,18 @@ export default function Orders() {
 
   useEffect(() => {
     const timer = setTimeout(fetchOrders, 300)
-    return () => clearTimeout(timer)
+
+    const channel = supabase
+      .channel('public:orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders()
+      })
+      .subscribe()
+
+    return () => {
+      clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
   }, [search, status])
 
   return (

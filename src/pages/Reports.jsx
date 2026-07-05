@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { BarChart2, TrendingUp, Package, Calendar, Download, FileSpreadsheet, FileText, Printer, Store, DollarSign } from 'lucide-react'
-import { getOrders } from '../lib/supabase'
+import { getOrders, supabase } from '../lib/supabase'
 import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
@@ -42,6 +42,17 @@ export default function Reports() {
       }
     }
     load()
+
+    const channel = supabase
+      .channel('public:orders:reports')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        load()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const filtered = orders.filter(o => {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, TrendingUp, Package, Clock, CheckCircle2, PlusCircle, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getOrders, getOrderStats } from '../lib/supabase'
+import { getOrders, getOrderStats, supabase } from '../lib/supabase'
 import StatCard from '../components/StatCard'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -55,6 +55,17 @@ export default function Dashboard() {
       }
     }
     load()
+
+    const channel = supabase
+      .channel('public:orders:dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        load()
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   const formatDate = (d) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
