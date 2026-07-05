@@ -1,4 +1,4 @@
-const CLIENT_ID = '190518949394-i86r2c8814ehnsc3aiu06fp6op0d569g.apps.googleusercontent.com'
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '190518949394-i86r2c8814ehnsc3aiu06fp6op0d569g.apps.googleusercontent.com'
 const SCOPES = [
   'https://www.googleapis.com/auth/drive.file',
   'https://www.googleapis.com/auth/drive.readonly',
