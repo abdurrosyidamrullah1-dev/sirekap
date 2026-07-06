@@ -74,6 +74,7 @@ export default function DriveManager() {
   const [selectedFiles, setSelectedFiles] = useState(new Set())
   const [dragSelecting, setDragSelecting] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, file: null })
 
   const connected = isGoogleSignedIn()
 
@@ -97,8 +98,13 @@ export default function DriveManager() {
 
   useEffect(() => {
     const handleMouseUp = () => setDragSelecting(false)
+    const handleClick = () => setContextMenu(prev => prev.visible ? { ...prev, visible: false } : prev)
     window.addEventListener('mouseup', handleMouseUp)
-    return () => window.removeEventListener('mouseup', handleMouseUp)
+    window.addEventListener('click', handleClick)
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('click', handleClick)
+    }
   }, [])
 
   const handleSelectFolder = async (folder) => {
@@ -514,6 +520,10 @@ export default function DriveManager() {
                             onMouseEnter={() => {
                               if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
                             }}
+                            onContextMenu={e => {
+                              e.preventDefault()
+                              setContextMenu({ visible: true, x: e.clientX, y: e.clientY, file })
+                            }}
                             onDragStart={e => e.preventDefault()}
                             style={{
                               background: isSelected ? 'var(--accent-light)' : (isPreviewActive ? 'var(--bg-tertiary)' : 'var(--bg-card)'),
@@ -592,6 +602,10 @@ export default function DriveManager() {
                             }}
                             onMouseEnter={() => {
                               if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
+                            }}
+                            onContextMenu={e => {
+                              e.preventDefault()
+                              setContextMenu({ visible: true, x: e.clientX, y: e.clientY, file })
                             }}
                             style={{
                               background: isSelected ? 'var(--accent-light)' : (isPreviewActive ? 'var(--bg-tertiary)' : 'var(--bg-card)'),
@@ -721,6 +735,101 @@ export default function DriveManager() {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {contextMenu.visible && contextMenu.file && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              boxShadow: 'var(--shadow-lg)',
+              zIndex: 1000,
+              padding: 4,
+              minWidth: 160,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2
+            }}
+            onClick={e => e.stopPropagation()}
+            onContextMenu={e => { e.preventDefault(); e.stopPropagation() }}
+          >
+            <button 
+              className="btn btn-ghost btn-sm" 
+              style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13 }}
+              onClick={() => {
+                setSelectedFiles(prev => {
+                  const next = new Set(prev)
+                  if (next.has(contextMenu.file.id)) next.delete(contextMenu.file.id)
+                  else next.add(contextMenu.file.id)
+                  return next
+                })
+                setContextMenu({ visible: false, x: 0, y: 0, file: null })
+              }}
+            >
+              <CheckSquare size={14} style={{ marginRight: 8, color: 'var(--text-muted)' }} /> 
+              {selectedFiles.has(contextMenu.file.id) ? 'Batal Pilih' : 'Pilih File'}
+            </button>
+            
+            <button 
+              className="btn btn-ghost btn-sm" 
+              style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13 }}
+              onClick={() => {
+                setSelectedFile(contextMenu.file)
+                setContextMenu({ visible: false, x: 0, y: 0, file: null })
+              }}
+            >
+              <Eye size={14} style={{ marginRight: 8, color: 'var(--text-muted)' }} /> Lihat / Preview
+            </button>
+
+            {contextMenu.file.webViewLink && (
+              <a 
+                href={contextMenu.file.webViewLink} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="btn btn-ghost btn-sm" 
+                style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13 }}
+                onClick={() => setContextMenu({ visible: false, x: 0, y: 0, file: null })}
+              >
+                <ExternalLink size={14} style={{ marginRight: 8, color: 'var(--text-muted)' }} /> Buka di Drive
+              </a>
+            )}
+
+            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+            {selectedFiles.size > 1 && selectedFiles.has(contextMenu.file.id) ? (
+              <button 
+                className="btn btn-ghost btn-sm" 
+                style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13, color: 'var(--danger)' }}
+                onClick={() => {
+                  handleBatchDeleteClick()
+                  setContextMenu({ visible: false, x: 0, y: 0, file: null })
+                }}
+              >
+                <Trash2 size={14} style={{ marginRight: 8 }} /> Hapus {selectedFiles.size} Terpilih
+              </button>
+            ) : (
+              <button 
+                className="btn btn-ghost btn-sm" 
+                style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13, color: 'var(--danger)' }}
+                onClick={() => {
+                  handleDeleteFile(contextMenu.file)
+                  setContextMenu({ visible: false, x: 0, y: 0, file: null })
+                }}
+              >
+                <Trash2 size={14} style={{ marginRight: 8 }} /> Hapus File
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ConfirmModal 
         isOpen={confirmModal.isOpen}
