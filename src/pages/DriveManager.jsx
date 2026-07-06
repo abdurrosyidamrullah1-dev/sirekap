@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FolderOpen, Search, HardDrive, File, FileText,
-  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X, Plus, Upload, FolderUp
+  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X, Plus, Upload, FolderUp, CheckSquare
 } from 'lucide-react'
 import { getAllOrderFolders, getDriveFilesByFolder, isGoogleSignedIn, deleteDriveFile, createFolder, uploadFileToDrive } from '../lib/drive'
 import toast from 'react-hot-toast'
@@ -70,6 +70,10 @@ export default function DriveManager() {
   const [newFolderName, setNewFolderName] = useState('')
   const [uploadingFile, setUploadingFile] = useState(false)
   const [uploadingFolder, setUploadingFolder] = useState(false)
+  
+  const [selectedFiles, setSelectedFiles] = useState(new Set())
+  const [dragSelecting, setDragSelecting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
 
   const connected = isGoogleSignedIn()
 
@@ -91,9 +95,16 @@ export default function DriveManager() {
     loadFolders()
   }, [connected])
 
+  useEffect(() => {
+    const handleMouseUp = () => setDragSelecting(false)
+    window.addEventListener('mouseup', handleMouseUp)
+    return () => window.removeEventListener('mouseup', handleMouseUp)
+  }, [])
+
   const handleSelectFolder = async (folder) => {
     setSelectedFolder(folder)
     setSelectedFile(null)
+    setSelectedFiles(new Set())
     setLoadingFiles(true)
     setFiles([])
     try {
@@ -114,7 +125,7 @@ export default function DriveManager() {
       setNewFolderName('')
       setCreatingFolder(false)
       toast.success('Folder berhasil dibuat')
-      handleSelectFolder(folder) // open it automatically
+      handleSelectFolder(folder)
     } catch (err) {
       toast.error('Gagal membuat folder')
       console.error(err)
@@ -129,7 +140,11 @@ export default function DriveManager() {
     try {
       let newFiles = []
       for (let i = 0; i < filesToUpload.length; i++) {
-        const uploaded = await uploadFileToDrive(filesToUpload[i], selectedFolder.id)
+        const file = filesToUpload[i]
+        setUploadProgress({ name: file.name, current: i + 1, total: filesToUpload.length, percent: 0 })
+        const uploaded = await uploadFileToDrive(file, selectedFolder.id, (percent) => {
+          setUploadProgress(prev => prev ? { ...prev, percent } : null)
+        })
         newFiles.push(uploaded)
       }
       setFiles(prev => [...newFiles, ...prev])
@@ -139,7 +154,8 @@ export default function DriveManager() {
       console.error(err)
     } finally {
       setUploadingFile(false)
-      e.target.value = null // reset input
+      setUploadProgress(null)
+      e.target.value = null
     }
   }
 
@@ -151,25 +167,29 @@ export default function DriveManager() {
     const folderName = firstPath ? firstPath.split('/')[0] : 'Folder Baru'
     
     setUploadingFolder(true)
-    toast.loading(`Membuat folder dan mengupload ${filesToUpload.length} file...`, { id: 'upload-folder' })
     try {
       const folder = await createFolder(folderName)
       setFolders(prev => [folder, ...prev])
       setSelectedFolder(folder)
-      setFiles([]) // Reset right panel for new folder
+      setFiles([])
       
       let newFiles = []
       for (let i = 0; i < filesToUpload.length; i++) {
-        const uploaded = await uploadFileToDrive(filesToUpload[i], folder.id)
+        const file = filesToUpload[i]
+        setUploadProgress({ name: file.name, current: i + 1, total: filesToUpload.length, percent: 0 })
+        const uploaded = await uploadFileToDrive(file, folder.id, (percent) => {
+          setUploadProgress(prev => prev ? { ...prev, percent } : null)
+        })
         newFiles.push(uploaded)
       }
       setFiles(newFiles)
-      toast.success(`Folder "${folderName}" berhasil diupload!`, { id: 'upload-folder' })
+      toast.success(`Folder "${folderName}" berhasil diupload!`)
     } catch (err) {
-      toast.error('Gagal upload folder', { id: 'upload-folder' })
+      toast.error('Gagal upload folder')
       console.error(err)
     } finally {
       setUploadingFolder(false)
+      setUploadProgress(null)
       e.target.value = null
     }
   }
@@ -182,25 +202,38 @@ export default function DriveManager() {
     setConfirmModal({ isOpen: true, type: 'folder', target: folder })
   }
 
+  const handleBatchDeleteClick = () => {
+    setConfirmModal({ isOpen: true, type: 'batch', target: null })
+  }
+
   const confirmDelete = async () => {
     const { type, target } = confirmModal
     setDeleting(true)
     
     try {
-      await deleteDriveFile(target.id)
-      
-      if (type === 'file') {
+      if (type === 'batch') {
+        const filesToDelete = files.filter(f => selectedFiles.has(f.id))
+        for (const file of filesToDelete) {
+          await deleteDriveFile(file.id).catch(() => {})
+        }
+        setFiles(prev => prev.filter(f => !selectedFiles.has(f.id)))
+        setSelectedFiles(new Set())
+        setSelectedFile(null)
+        toast.success(`${selectedFiles.size} file berhasil dihapus`)
+      } else if (type === 'file') {
+        await deleteDriveFile(target.id)
         setFiles(prev => prev.filter(f => f.id !== target.id))
         setSelectedFile(null)
+        setSelectedFiles(prev => { const next = new Set(prev); next.delete(target.id); return next; })
         toast.success('File berhasil dihapus')
       } else {
+        await deleteDriveFile(target.id)
         setFolders(prev => prev.filter(f => f.id !== target.id))
         setSelectedFolder(null)
         setFiles([])
         setSelectedFile(null)
         toast.success('Folder berhasil dihapus')
       }
-      
       setConfirmModal({ isOpen: false, type: null, target: null })
     } catch (err) {
       console.error(err)
@@ -355,7 +388,7 @@ export default function DriveManager() {
           {selectedFolder ? (
             <>
               {/* Header */}
-              <div className="card-header" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', justifyContent: 'space-between' }}>
+              <div className="card-header" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <FolderOpen size={20} style={{ color: 'var(--accent)' }} />
@@ -368,6 +401,17 @@ export default function DriveManager() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  {selectedFiles.size > 0 && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--bg-tertiary)', padding: '4px 12px', borderRadius: 8, marginRight: 8 }}>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{selectedFiles.size} dipilih</span>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setSelectedFiles(new Set(files.map(f => f.id)))} style={{ fontSize: 11, padding: '4px 8px' }}>Pilih Semua</button>
+                      <button className="btn btn-sm btn-ghost" onClick={() => setSelectedFiles(new Set())} style={{ fontSize: 11, padding: '4px 8px' }}>Batal</button>
+                      <button className="btn btn-sm" onClick={handleBatchDeleteClick} style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: 11, padding: '4px 8px' }}>
+                        <Trash2 size={12} style={{ marginRight: 4 }}/> Hapus
+                      </button>
+                    </div>
+                  )}
+
                   <label className="btn btn-primary btn-sm" style={{ cursor: uploadingFile ? 'not-allowed' : 'pointer', padding: '6px 12px', fontSize: 12 }}>
                     {uploadingFile ? <Loader2 size={14} className="spin" /> : <Upload size={14} />}
                     {uploadingFile ? 'Mengupload...' : 'Upload File'}
@@ -409,6 +453,27 @@ export default function DriveManager() {
                 </div>
               </div>
 
+              {/* Progress Bar Area */}
+              <AnimatePresence>
+                {uploadProgress && (
+                  <motion.div className="file-item" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ borderBottom: '1px solid var(--border)', background: 'var(--accent-light)', display: 'block', padding: '16px 24px', borderRadius: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent)' }}>
+                        <Loader2 size={16} className="spin" /> 
+                        Mengupload {uploadProgress.current} dari {uploadProgress.total} file
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)' }}>{uploadProgress.percent}%</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {uploadProgress.name}
+                    </div>
+                    <div style={{ width: '100%', height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+                      <motion.div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3 }} initial={{ width: 0 }} animate={{ width: `${uploadProgress.percent}%` }} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Files Area */}
               <div style={{ flex: 1, overflowY: 'auto', padding: 24, background: 'var(--bg-secondary)' }}>
                 {loadingFiles ? (
@@ -423,37 +488,58 @@ export default function DriveManager() {
                   </div>
                 ) : (
                   viewMode === 'grid' ? (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 16, userSelect: 'none' }}>
                       {files.map((file, i) => {
                         const cat = getFileCategory(file.mimeType, file.name)
                         const Icon = FILE_ICONS[cat] || File
                         const isImg = cat === 'image'
+                        const isSelected = selectedFiles.has(file.id)
+                        const isPreviewActive = selectedFile?.id === file.id
                         return (
                           <motion.div
                             key={file.id}
-                            onClick={() => setSelectedFile(file)}
                             initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: i * 0.03 }}
-                            style={{
-                              background: selectedFile?.id === file.id ? 'var(--bg-tertiary)' : 'var(--bg-card)',
-                              border: `1px solid ${selectedFile?.id === file.id ? 'var(--blue-400)' : 'var(--border)'}`,
-                              borderRadius: 14, overflow: 'hidden', textDecoration: 'none', cursor: 'pointer',
-                              color: 'inherit', display: 'flex', flexDirection: 'column',
+                            onMouseDown={(e) => {
+                              if (e.target.closest('button') || e.target.closest('a')) return
+                              if (e.detail === 2) { setSelectedFile(file); return }
+                              setDragSelecting(true)
+                              setSelectedFiles(prev => {
+                                const next = new Set(prev)
+                                if (next.has(file.id)) next.delete(file.id)
+                                else next.add(file.id)
+                                return next
+                              })
                             }}
-                            whileHover={{ y: -4, boxShadow: 'var(--shadow-md)', borderColor: 'var(--blue-200)' }}
+                            onMouseEnter={() => {
+                              if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
+                            }}
+                            onDragStart={e => e.preventDefault()}
+                            style={{
+                              background: isSelected ? 'var(--accent-light)' : (isPreviewActive ? 'var(--bg-tertiary)' : 'var(--bg-card)'),
+                              border: `1px solid ${isSelected ? 'var(--accent)' : (isPreviewActive ? 'var(--blue-400)' : 'var(--border)')}`,
+                              borderRadius: 14, overflow: 'hidden', textDecoration: 'none', cursor: 'pointer',
+                              color: 'inherit', display: 'flex', flexDirection: 'column', position: 'relative'
+                            }}
+                            whileHover={{ y: -4, boxShadow: 'var(--shadow-md)', borderColor: isSelected ? 'var(--accent)' : 'var(--blue-200)' }}
                           >
+                            {isSelected && (
+                              <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, color: 'var(--accent)', background: 'white', borderRadius: 4, display: 'flex' }}>
+                                <CheckSquare size={16} />
+                              </div>
+                            )}
                             <div style={{
                               height: 120, background: 'var(--bg-tertiary)',
                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                               position: 'relative'
                             }}>
                               {isImg && file.thumbnailLink ? (
-                                <img src={file.thumbnailLink} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                <img src={file.thumbnailLink} alt={file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} draggable="false" />
                               ) : (
                                 <Icon size={40} style={{ color: 'var(--accent)', opacity: 0.7 }} />
                               )}
                               
-                              {getFileBadge(file.name) && (
+                              {getFileBadge(file.name) && !isSelected && (
                                 <div style={{ 
                                   position: 'absolute', top: 8, left: 8, 
                                   background: getFileBadge(file.name).color,
@@ -469,7 +555,7 @@ export default function DriveManager() {
                               </div>
                             </div>
                             <div style={{ padding: '12px 14px' }}>
-                              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 4 }}>
                                 {file.name}
                               </div>
                               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)' }}>
@@ -482,33 +568,53 @@ export default function DriveManager() {
                       })}
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, userSelect: 'none' }}>
                       {files.map((file, i) => {
                         const cat = getFileCategory(file.mimeType, file.name)
                         const Icon = FILE_ICONS[cat] || File
+                        const isSelected = selectedFiles.has(file.id)
+                        const isPreviewActive = selectedFile?.id === file.id
                         return (
                           <motion.div
                             key={file.id}
-                            onClick={() => setSelectedFile(file)}
                             initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                             transition={{ delay: i * 0.02 }}
+                            onMouseDown={(e) => {
+                              if (e.target.closest('button') || e.target.closest('a')) return
+                              if (e.detail === 2) { setSelectedFile(file); return }
+                              setDragSelecting(true)
+                              setSelectedFiles(prev => {
+                                const next = new Set(prev)
+                                if (next.has(file.id)) next.delete(file.id)
+                                else next.add(file.id)
+                                return next
+                              })
+                            }}
+                            onMouseEnter={() => {
+                              if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
+                            }}
                             style={{
-                              background: selectedFile?.id === file.id ? 'var(--bg-tertiary)' : 'var(--bg-card)',
-                              border: `1px solid ${selectedFile?.id === file.id ? 'var(--blue-400)' : 'var(--border)'}`,
+                              background: isSelected ? 'var(--accent-light)' : (isPreviewActive ? 'var(--bg-tertiary)' : 'var(--bg-card)'),
+                              border: `1px solid ${isSelected ? 'var(--accent)' : (isPreviewActive ? 'var(--blue-400)' : 'var(--border)')}`,
                               borderRadius: 12, padding: '10px 14px', textDecoration: 'none', cursor: 'pointer',
                               display: 'flex', alignItems: 'center', gap: 14,
                               color: 'inherit',
                             }}
-                            whileHover={{ x: 4, borderColor: 'var(--blue-200)', background: 'var(--accent-light)' }}
+                            whileHover={{ x: 4, borderColor: isSelected ? 'var(--accent)' : 'var(--blue-200)', background: isSelected ? 'var(--accent-light)' : 'var(--bg-tertiary)' }}
                           >
-                            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: 'var(--bg-card)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
+                              {isSelected && (
+                                <div style={{ position: 'absolute', inset: -2, zIndex: 10, color: 'var(--accent)', background: 'var(--bg-card)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <CheckSquare size={18} />
+                                </div>
+                              )}
                               {cat === 'image' && file.thumbnailLink ? (
-                                <img src={file.thumbnailLink} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} />
+                                <img src={file.thumbnailLink} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 8 }} draggable="false" />
                               ) : <Icon size={18} style={{ color: 'var(--text-secondary)' }} />}
                             </div>
                             <div style={{ flex: 1, minWidth: 0 }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{file.name}</div>
                                 {getFileBadge(file.name) && (
                                   <div style={{ 
                                     background: `${getFileBadge(file.name).color}20`,
@@ -620,10 +726,12 @@ export default function DriveManager() {
         isOpen={confirmModal.isOpen}
         onClose={() => !deleting && setConfirmModal({ isOpen: false, type: null, target: null })}
         onConfirm={confirmDelete}
-        title={confirmModal.type === 'folder' ? 'Hapus Folder Permanen?' : 'Hapus File Permanen?'}
+        title={confirmModal.type === 'folder' ? 'Hapus Folder Permanen?' : confirmModal.type === 'batch' ? 'Hapus File Terpilih?' : 'Hapus File Permanen?'}
         message={
           confirmModal.type === 'folder' 
             ? `Yakin ingin menghapus folder "${confirmModal.target?.name}" beserta SEMUA isinya? Tindakan ini tidak bisa dibatalkan.` 
+            : confirmModal.type === 'batch'
+            ? `Yakin ingin menghapus ${selectedFiles.size} file yang dipilih secara permanen? Tindakan ini tidak bisa dibatalkan.`
             : `Yakin ingin menghapus file "${confirmModal.target?.name}"? Tindakan ini tidak bisa dibatalkan.`
         }
         isLoading={deleting}

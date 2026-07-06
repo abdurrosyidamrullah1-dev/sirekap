@@ -213,30 +213,49 @@ export const getAllOrderFolders = async () => {
 }
 
 // ─── Drive: File Operations ────────────────────────────────────────────────────
-export const uploadFileToDrive = async (file, folderId) => {
-  const token = getAccessToken()
-  if (!token) throw new Error('Not signed in to Google Drive')
+export const uploadFileToDrive = (file, folderId, onProgress) => {
+  return new Promise((resolve, reject) => {
+    const token = getAccessToken()
+    if (!token) return reject(new Error('Not signed in to Google Drive'))
 
-  const metadata = { name: file.name, parents: [folderId] }
-  const form = new FormData()
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-  form.append('file', file)
+    const metadata = { name: file.name, parents: [folderId] }
+    const form = new FormData()
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
+    form.append('file', file)
 
-  const res = await fetch(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,mimeType,size,thumbnailLink',
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,webContentLink,mimeType,size,thumbnailLink')
+    xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+
+    if (onProgress) {
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100)
+          onProgress(percent)
+        }
+      }
     }
-  )
 
-  if (!res.ok) {
-    const err = await res.json()
-    throw new Error(err.error?.message || 'Upload failed')
-  }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText))
+        } catch {
+          resolve(xhr.responseText)
+        }
+      } else {
+        try {
+          const err = JSON.parse(xhr.responseText)
+          reject(new Error(err.error?.message || 'Upload failed'))
+        } catch {
+          reject(new Error(`Upload failed with status ${xhr.status}`))
+        }
+      }
+    }
 
-  return res.json()
+    xhr.onerror = () => reject(new Error('Network error during upload'))
+    xhr.send(form)
+  })
 }
 
 export const getDriveFilesByFolder = async (folderId) => {
