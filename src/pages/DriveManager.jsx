@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FolderOpen, Search, HardDrive, File, FileText,
-  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X
+  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X, Plus, Upload
 } from 'lucide-react'
-import { getAllOrderFolders, getDriveFilesByFolder, isGoogleSignedIn, deleteDriveFile } from '../lib/drive'
+import { getAllOrderFolders, getDriveFilesByFolder, isGoogleSignedIn, deleteDriveFile, createFolder, uploadFileToDrive } from '../lib/drive'
 import toast from 'react-hot-toast'
 import ConfirmModal from '../components/ConfirmModal'
 
@@ -66,6 +66,10 @@ export default function DriveManager() {
   const [deleting, setDeleting] = useState(false)
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, target: null })
 
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const [uploadingFile, setUploadingFile] = useState(false)
+
   const connected = isGoogleSignedIn()
 
   useEffect(() => {
@@ -98,6 +102,43 @@ export default function DriveManager() {
       console.error('Failed to load files:', err)
     } finally {
       setLoadingFiles(false)
+    }
+  }
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim()) return
+    try {
+      const folder = await createFolder(newFolderName)
+      setFolders(prev => [folder, ...prev])
+      setNewFolderName('')
+      setCreatingFolder(false)
+      toast.success('Folder berhasil dibuat')
+      handleSelectFolder(folder) // open it automatically
+    } catch (err) {
+      toast.error('Gagal membuat folder')
+      console.error(err)
+    }
+  }
+
+  const handleUploadFile = async (e) => {
+    const filesToUpload = e.target.files
+    if (!filesToUpload || filesToUpload.length === 0 || !selectedFolder) return
+    
+    setUploadingFile(true)
+    try {
+      let newFiles = []
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const uploaded = await uploadFileToDrive(filesToUpload[i], selectedFolder.id)
+        newFiles.push(uploaded)
+      }
+      setFiles(prev => [...newFiles, ...prev])
+      toast.success(`${filesToUpload.length} file diupload`)
+    } catch (err) {
+      toast.error('Gagal upload file')
+      console.error(err)
+    } finally {
+      setUploadingFile(false)
+      e.target.value = null // reset input
     }
   }
 
@@ -171,17 +212,52 @@ export default function DriveManager() {
       <div style={{ display: 'flex', gap: 20, flex: 1, minHeight: 0 }}>
         {/* Left Sidebar: Folders */}
         <div className="card" style={{ width: 340, display: 'flex', flexDirection: 'column' }}>
-          <div className="card-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ position: 'relative', width: '100%' }}>
-              <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-              <input
-                className="form-input"
-                placeholder="Cari folder orderan..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{ paddingLeft: 38, fontSize: 13, height: 40, borderRadius: 99, background: 'var(--bg-tertiary)' }}
-              />
+          <div className="card-header" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'block' }}>
+            <div style={{ position: 'relative', width: '100%', display: 'flex', gap: 8 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                <input
+                  className="form-input"
+                  placeholder="Cari folder..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  style={{ paddingLeft: 38, fontSize: 13, height: 40, borderRadius: 99, background: 'var(--bg-tertiary)' }}
+                />
+              </div>
+              <button 
+                onClick={() => setCreatingFolder(true)}
+                className="btn btn-primary" 
+                style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 99, flexShrink: 0 }}
+                title="Buat Folder"
+              >
+                <Plus size={18} />
+              </button>
             </div>
+            
+            <AnimatePresence>
+              {creatingFolder && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1, marginTop: 12 }}
+                  exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input 
+                      autoFocus
+                      className="form-input" 
+                      placeholder="Nama folder baru..." 
+                      value={newFolderName}
+                      onChange={e => setNewFolderName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleCreateFolder()}
+                      style={{ fontSize: 12, height: 32 }}
+                    />
+                    <button className="btn btn-primary btn-sm" onClick={handleCreateFolder}>Buat</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setCreatingFolder(false)}><X size={14}/></button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
             {loading ? (
@@ -243,7 +319,19 @@ export default function DriveManager() {
                     </div>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <label className="btn btn-primary btn-sm" style={{ cursor: uploadingFile ? 'not-allowed' : 'pointer', padding: '6px 12px', fontSize: 12 }}>
+                    {uploadingFile ? <Loader2 size={14} className="spin" /> : <Upload size={14} />}
+                    {uploadingFile ? 'Mengupload...' : 'Upload File'}
+                    <input 
+                      type="file" 
+                      multiple
+                      onChange={handleUploadFile}
+                      style={{ display: 'none' }} 
+                      disabled={uploadingFile}
+                    />
+                  </label>
+
                   <div style={{ display: 'flex', background: 'var(--bg-tertiary)', padding: 4, borderRadius: 8 }}>
                     {['grid','list'].map(m => (
                       <button key={m} onClick={() => setViewMode(m)}

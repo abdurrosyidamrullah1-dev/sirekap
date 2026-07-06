@@ -183,6 +183,19 @@ export const createOrderFolder = async (customerName, orderId) => {
   return { id: folder.id, url: folder.webViewLink, name: folder.name }
 }
 
+export const createFolder = async (folderName) => {
+  const token = getAccessToken()
+  const rootId = await getOrCreateRootFolder()
+
+  const folder = await driveApi('files', 'POST', {
+    name: folderName,
+    mimeType: 'application/vnd.google-apps.folder',
+    parents: [rootId],
+  }, { fields: 'id,webViewLink,name,createdTime' }, token)
+
+  return folder
+}
+
 export const getAllOrderFolders = async () => {
   const token = getAccessToken()
   if (!token) return []
