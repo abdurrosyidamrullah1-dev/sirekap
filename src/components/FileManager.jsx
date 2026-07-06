@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Upload, X, FileText, Image, File, Music, Video,
@@ -109,6 +109,17 @@ export default function FileManager({ order, onFilesChanged }) {
   const files = (order.order_files || []).filter(f =>
     !search || f.file_name.toLowerCase().includes(search.toLowerCase())
   )
+
+  useEffect(() => {
+    // Prevent default browser drag and drop behavior globally to avoid navigating to "html gak jelas"
+    const preventDefault = (e) => { e.preventDefault(); e.stopPropagation() }
+    window.addEventListener('dragover', preventDefault)
+    window.addEventListener('drop', preventDefault)
+    return () => {
+      window.removeEventListener('dragover', preventDefault)
+      window.removeEventListener('drop', preventDefault)
+    }
+  }, [])
 
   // ─── Upload ───────────────────────────────────────────────────────
   const processFiles = useCallback(async (rawFiles) => {
@@ -222,14 +233,14 @@ export default function FileManager({ order, onFilesChanged }) {
         <div style={{ display: 'flex', gap: 12, marginTop: 14, justifyContent: 'center' }}>
           <button 
             className="btn btn-secondary btn-sm"
-            onClick={() => inputRef.current?.click()}
+            onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }}
             style={{ fontWeight: 600 }}
           >
             <File size={14} /> Pilih File
           </button>
           <button 
             className="btn btn-secondary btn-sm"
-            onClick={() => folderInputRef.current?.click()}
+            onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click() }}
             style={{ fontWeight: 600 }}
           >
             <FolderOpen size={14} /> Pilih Folder
