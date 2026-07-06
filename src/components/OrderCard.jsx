@@ -32,10 +32,23 @@ export default function OrderCard({ order, index = 0 }) {
         </div>
       </td>
       <td>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" style={{ marginBottom: itemCount > 0 ? 4 : 0 }}>
           <Package size={14} style={{ color: 'var(--text-muted)' }} />
           <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{itemCount} item</span>
         </div>
+        {itemCount > 0 && (
+          <div style={{ display: 'flex', gap: 6, fontSize: 11, fontWeight: 600 }}>
+            {(order.order_items?.filter(it => it.status === 'done').length || 0) > 0 && (
+              <span style={{ color: 'var(--success)' }}>{order.order_items.filter(it => it.status === 'done').length} Selesai</span>
+            )}
+            {(order.order_items?.filter(it => it.status === 'in_progress').length || 0) > 0 && (
+              <span style={{ color: 'var(--blue-500)' }}>{order.order_items.filter(it => it.status === 'in_progress').length} Proses</span>
+            )}
+            {(order.order_items?.filter(it => it.status === 'pending').length || 0) > 0 && (
+              <span style={{ color: 'var(--warning)' }}>{order.order_items.filter(it => it.status === 'pending').length} Pending</span>
+            )}
+          </div>
+        )}
       </td>
       <td>
         <span className={`badge badge-${order.status}`} style={{ background: cfg.color + '20', color: cfg.color }}>

@@ -234,7 +234,24 @@ export default function Dashboard() {
                         {order.customer_name}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        {order.order_items?.length || 0} item · {formatDate(order.created_at)}
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                          <span>{order.order_items?.length || 0} item</span>
+                          <span>·</span>
+                          <span>{formatDate(order.created_at)}</span>
+                        </div>
+                        {(order.order_items?.length || 0) > 0 && (
+                          <div style={{ display: 'flex', gap: 6, fontSize: 11, fontWeight: 600, marginTop: 3 }}>
+                            {(order.order_items?.filter(it => it.status === 'done').length || 0) > 0 && (
+                              <span style={{ color: 'var(--success)' }}>{order.order_items.filter(it => it.status === 'done').length} Selesai</span>
+                            )}
+                            {(order.order_items?.filter(it => it.status === 'in_progress').length || 0) > 0 && (
+                              <span style={{ color: 'var(--blue-500)' }}>{order.order_items.filter(it => it.status === 'in_progress').length} Proses</span>
+                            )}
+                            {(order.order_items?.filter(it => it.status === 'pending').length || 0) > 0 && (
+                              <span style={{ color: 'var(--warning)' }}>{order.order_items.filter(it => it.status === 'pending').length} Pending</span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <span className={`badge badge-${order.status}`} style={{ fontSize: 11 }}>
