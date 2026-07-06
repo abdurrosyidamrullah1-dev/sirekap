@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FolderOpen, Search, HardDrive, File, FileText,
-  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X, Plus, Upload
+  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X, Plus, Upload, FolderUp
 } from 'lucide-react'
 import { getAllOrderFolders, getDriveFilesByFolder, isGoogleSignedIn, deleteDriveFile, createFolder, uploadFileToDrive } from '../lib/drive'
 import toast from 'react-hot-toast'
@@ -69,6 +69,7 @@ export default function DriveManager() {
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const [uploadingFile, setUploadingFile] = useState(false)
+  const [uploadingFolder, setUploadingFolder] = useState(false)
 
   const connected = isGoogleSignedIn()
 
@@ -139,6 +140,37 @@ export default function DriveManager() {
     } finally {
       setUploadingFile(false)
       e.target.value = null // reset input
+    }
+  }
+
+  const handleUploadFolder = async (e) => {
+    const filesToUpload = e.target.files
+    if (!filesToUpload || filesToUpload.length === 0) return
+    
+    const firstPath = filesToUpload[0].webkitRelativePath
+    const folderName = firstPath ? firstPath.split('/')[0] : 'Folder Baru'
+    
+    setUploadingFolder(true)
+    toast.loading(`Membuat folder dan mengupload ${filesToUpload.length} file...`, { id: 'upload-folder' })
+    try {
+      const folder = await createFolder(folderName)
+      setFolders(prev => [folder, ...prev])
+      setSelectedFolder(folder)
+      setFiles([]) // Reset right panel for new folder
+      
+      let newFiles = []
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const uploaded = await uploadFileToDrive(filesToUpload[i], folder.id)
+        newFiles.push(uploaded)
+      }
+      setFiles(newFiles)
+      toast.success(`Folder "${folderName}" berhasil diupload!`, { id: 'upload-folder' })
+    } catch (err) {
+      toast.error('Gagal upload folder', { id: 'upload-folder' })
+      console.error(err)
+    } finally {
+      setUploadingFolder(false)
+      e.target.value = null
     }
   }
 
@@ -224,11 +256,27 @@ export default function DriveManager() {
                   style={{ paddingLeft: 38, fontSize: 13, height: 40, borderRadius: 99, background: 'var(--bg-tertiary)' }}
                 />
               </div>
+              <label 
+                className="btn btn-secondary" 
+                style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 99, flexShrink: 0, cursor: uploadingFolder ? 'not-allowed' : 'pointer' }}
+                title="Upload Folder"
+              >
+                {uploadingFolder ? <Loader2 size={16} className="spin" /> : <FolderUp size={16} />}
+                <input 
+                  type="file" 
+                  webkitdirectory="true" 
+                  directory="true" 
+                  multiple
+                  onChange={handleUploadFolder}
+                  style={{ display: 'none' }} 
+                  disabled={uploadingFolder}
+                />
+              </label>
               <button 
                 onClick={() => setCreatingFolder(true)}
                 className="btn btn-primary" 
                 style={{ width: 40, height: 40, padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 99, flexShrink: 0 }}
-                title="Buat Folder"
+                title="Buat Folder Kosong"
               >
                 <Plus size={18} />
               </button>

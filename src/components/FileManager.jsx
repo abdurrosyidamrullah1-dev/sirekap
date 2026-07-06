@@ -104,6 +104,7 @@ export default function FileManager({ order, onFilesChanged }) {
   const [search, setSearch] = useState('')
   const [deleting, setDeleting] = useState(null)
   const inputRef = useRef()
+  const folderInputRef = useRef()
 
   const files = (order.order_files || []).filter(f =>
     !search || f.file_name.toLowerCase().includes(search.toLowerCase())
@@ -198,23 +199,42 @@ export default function FileManager({ order, onFilesChanged }) {
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        onClick={() => inputRef.current?.click()}
-        whileHover={{ scale: 1.01 }}
-        whileTap={{ scale: 0.99 }}
-        style={{ marginBottom: 16, cursor: 'pointer' }}
+        style={{ marginBottom: 16 }}
       >
         <input ref={inputRef} type="file" multiple style={{ display: 'none' }}
           onChange={e => { processFiles(e.target.files); e.target.value = '' }}
           accept="image/*,.pdf,.ai,.psd,.svg,.eps,.cdr,.zip,.rar" />
+        <input ref={folderInputRef} type="file" webkitdirectory="true" directory="true" multiple style={{ display: 'none' }}
+          onChange={e => { processFiles(e.target.files); e.target.value = '' }} />
+          
         <motion.div
           className="upload-zone-icon"
           animate={dragOver ? { scale: 1.2, rotate: 15 } : { scale: 1, rotate: 0 }}
           transition={{ type: 'spring', stiffness: 400 }}
+          onClick={() => inputRef.current?.click()}
+          style={{ cursor: 'pointer' }}
         >
           <Upload size={24} />
         </motion.div>
-        <h4>Drop file desain di sini</h4>
+        <h4>Drop file atau folder desain di sini</h4>
         <p>PNG, JPG, PDF, AI, PSD, SVG, CDR, ZIP — klik atau drag</p>
+        
+        <div style={{ display: 'flex', gap: 12, marginTop: 14, justifyContent: 'center' }}>
+          <button 
+            className="btn btn-secondary btn-sm"
+            onClick={() => inputRef.current?.click()}
+            style={{ fontWeight: 600 }}
+          >
+            <File size={14} /> Pilih File
+          </button>
+          <button 
+            className="btn btn-secondary btn-sm"
+            onClick={() => folderInputRef.current?.click()}
+            style={{ fontWeight: 600 }}
+          >
+            <FolderOpen size={14} /> Pilih Folder
+          </button>
+        </div>
       </motion.div>
 
       {/* Uploading progress */}
