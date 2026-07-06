@@ -79,87 +79,6 @@ function PreviewModal({ file, onClose }) {
 
 export default function FileManager({ order, onFilesChanged }) {
   const [dragOver, setDragOver] = useState(false)
-import { useState, useCallback, useRef, useEffect } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import {
-  Upload, X, FileText, Image, File, Music, Video,
-  Loader2, Grid, List, ExternalLink, Trash2, Download,
-  FolderOpen, Eye, Search, SortAsc, CheckSquare
-} from 'lucide-react'
-import { uploadFileToDrive, createOrderFolder, isGoogleSignedIn, getDriveFilesByFolder, deleteDriveFile } from '../lib/drive'
-import { addOrderFile, deleteOrderFile, updateOrder } from '../lib/supabase'
-import toast from 'react-hot-toast'
-import ConfirmModal from './ConfirmModal'
-
-const FILE_ICONS = {
-  image: Image,
-  video: Video,
-  audio: Music,
-  pdf: FileText,
-  text: FileText,
-  default: File,
-}
-
-const getFileCategory = (mimeType = '', name = '') => {
-  if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(name)) return 'image'
-  if (mimeType.startsWith('video/') || /\.(mp4|mov|avi|mkv)$/i.test(name)) return 'video'
-  if (mimeType.startsWith('audio/') || /\.(mp3|wav|flac)$/i.test(name)) return 'audio'
-  if (mimeType === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf'
-  return 'default'
-}
-
-const formatBytes = (bytes) => {
-  if (!bytes) return '-'
-  if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
-  return (bytes / 1048576).toFixed(1) + ' MB'
-}
-
-function PreviewModal({ file, onClose }) {
-  const cat = getFileCategory(file.mimeType, file.file_name)
-  return (
-    <motion.div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 400,
-        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      }}
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={onClose}
-    >
-      <motion.div
-        onClick={e => e.stopPropagation()}
-        initial={{ scale: 0.85 }} animate={{ scale: 1 }}
-        style={{ maxWidth: '85vw', maxHeight: '85vh', position: 'relative' }}
-      >
-        <div style={{ position: 'absolute', top: -48, right: 0, display: 'flex', gap: 8 }}>
-          {file.drive_file_url && (
-            <a href={file.drive_file_url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
-              <ExternalLink size={13} /> Buka di Drive
-            </a>
-          )}
-          <button className="btn btn-secondary btn-sm" onClick={onClose}><X size={13} /> Tutup</button>
-        </div>
-        {cat === 'image' && file.drive_file_url ? (
-          <img src={`https://drive.google.com/uc?id=${file.drive_file_id}&export=view`} alt={file.file_name} style={{ maxWidth: '85vw', maxHeight: '80vh', borderRadius: 12, objectFit: 'contain' }} onError={e => { e.target.style.display = 'none' }} />
-        ) : (
-          <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: '48px 64px', textAlign: 'center', border: '1px solid var(--border)' }}>
-            {(() => { const Icon = FILE_ICONS[cat] || File; return <Icon size={64} style={{ color: 'var(--accent)', marginBottom: 16 }} /> })()}
-            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 8 }}>{file.file_name}</div>
-            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Preview tidak tersedia untuk tipe file ini</div>
-            {file.drive_file_url && (
-              <a href={file.drive_file_url} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ marginTop: 16, display: 'inline-flex' }}><ExternalLink size={14} /> Buka di Drive</a>
-            )}
-          </div>
-        )}
-        <div style={{ textAlign: 'center', marginTop: 12, color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>{file.file_name}</div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-export default function FileManager({ order, onFilesChanged }) {
-  const [dragOver, setDragOver] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(null)
   const [viewMode, setViewMode] = useState('grid')
   const [preview, setPreview] = useState(null)
@@ -407,8 +326,9 @@ export default function FileManager({ order, onFilesChanged }) {
                   onMouseEnter={() => {
                     if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
                   }}
-                  onContextMenu={e => {
+                  onContextMenu={(e) => {
                     e.preventDefault()
+                    e.stopPropagation()
                     setContextMenu({ visible: true, x: e.clientX, y: e.clientY, file })
                   }}
                   style={{
@@ -473,8 +393,9 @@ export default function FileManager({ order, onFilesChanged }) {
                   onMouseEnter={() => {
                     if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
                   }}
-                  onContextMenu={e => {
+                  onContextMenu={(e) => {
                     e.preventDefault()
+                    e.stopPropagation()
                     setContextMenu({ visible: true, x: e.clientX, y: e.clientY, file })
                   }}
                   style={{
