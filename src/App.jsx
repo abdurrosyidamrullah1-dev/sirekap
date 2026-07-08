@@ -4,38 +4,26 @@ import { Toaster } from 'react-hot-toast'
 import { useEffect } from 'react'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
-import AdminDashboard from './pages/AdminDashboard'
 import Orders from './pages/Orders'
 import OrderForm from './pages/OrderForm'
-import AdminOrderForm from './pages/AdminOrderForm'
 import OrderDetail from './pages/OrderDetail'
 import Reports from './pages/Reports'
 import DriveManager from './pages/DriveManager'
-import Login from './pages/Login'
 import { initGoogleAPI } from './lib/drive'
-import { isLoggedIn, getRole } from './lib/auth'
 import './index.css'
-
-function ProtectedRoute({ children }) {
-  if (!isLoggedIn()) return <Navigate to="/login" replace />
-  return children
-}
 
 function AnimatedRoutes() {
   const location = useLocation()
-  const role = getRole()
 
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
-        <Route path="/login" element={<Login />} />
-        <Route path="/"             element={<ProtectedRoute>{role === 'admin' ? <AdminDashboard /> : <Dashboard />}</ProtectedRoute>} />
-        <Route path="/admin"        element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
-        <Route path="/orders"       element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-        <Route path="/orders/new"   element={<ProtectedRoute>{role === 'admin' ? <AdminOrderForm /> : <OrderForm />}</ProtectedRoute>} />
-        <Route path="/orders/:id"   element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
-        <Route path="/drive"        element={<ProtectedRoute><DriveManager /></ProtectedRoute>} />
-        <Route path="/reports"      element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+        <Route path="/"             element={<Dashboard />} />
+        <Route path="/orders"       element={<Orders />} />
+        <Route path="/orders/new"   element={<OrderForm />} />
+        <Route path="/orders/:id"   element={<OrderDetail />} />
+        <Route path="/drive"        element={<DriveManager />} />
+        <Route path="/reports"      element={<Reports />} />
         <Route path="*"             element={<Navigate to="/" replace />} />
       </Routes>
     </AnimatePresence>
@@ -43,29 +31,21 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
-  const role = getRole()
-
   useEffect(() => {
     initGoogleAPI().catch(console.error)
-    // Apply role-based theme to <html>
-    if (role) {
-      document.documentElement.setAttribute('data-role', role)
-    } else {
-      document.documentElement.removeAttribute('data-role')
-    }
-  }, [role])
-
-  const loggedIn = isLoggedIn()
+    document.documentElement.setAttribute('data-role', 'designer')
+  }, [])
 
   return (
     <BrowserRouter>
       <div className="app-layout">
-        {loggedIn && <Sidebar />}
-        <div className={loggedIn ? 'main-content' : 'main-content-full'}>
+        <Sidebar />
+        <div className="main-content">
           <AnimatedRoutes />
         </div>
       </div>
       <Toaster
+
         position="top-right"
         toastOptions={{
           style: {

@@ -1,21 +1,12 @@
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, HardDrive, AlertCircle, X, CheckCircle, FolderOpen, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, HardDrive, AlertCircle, X, FolderOpen } from 'lucide-react'
 import { isGoogleSignedIn, signInToGoogle, signOutGoogle, initGoogleAPI } from '../lib/drive'
-import { getRole, logout } from '../lib/auth'
 import { useState, useEffect } from 'react'
 import { MonitorDown } from 'lucide-react'
 
 const DESIGNER_NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/orders', icon: ClipboardList, label: 'Semua Orderan' },
-  { to: '/orders/new', icon: PlusCircle, label: 'Tambah Orderan' },
-  { to: '/drive', icon: FolderOpen, label: 'Drive Manager' },
-  { to: '/reports', icon: BarChart2, label: 'Laporan' },
-]
-
-const ADMIN_NAV = [
-  { to: '/admin', icon: ShieldCheck, label: 'Admin Dashboard' },
   { to: '/orders', icon: ClipboardList, label: 'Semua Orderan' },
   { to: '/orders/new', icon: PlusCircle, label: 'Tambah Orderan' },
   { to: '/drive', icon: FolderOpen, label: 'Drive Manager' },
@@ -60,8 +51,6 @@ function DriveSetupModal({ onClose }) {
               step: 1,
               title: 'Buka Google Cloud Console',
               desc: 'Pergi ke console.cloud.google.com → pilih project-mu',
-              link: 'https://console.cloud.google.com/apis/credentials',
-              linkLabel: 'Buka Credentials ↗',
             },
             {
               step: 2,
@@ -100,20 +89,10 @@ function DriveSetupModal({ onClose }) {
                   }}>{s.code}</div>
                 )}
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.desc}</div>
-                {s.link && (
-                  <a href={s.link} target="_blank" rel="noreferrer"
-                    style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600, textDecoration: 'none', display: 'block', marginTop: 4 }}>
-                    {s.linkLabel}
-                  </a>
-                )}
               </div>
             </div>
           ))}
         </div>
-
-        <button className="btn btn-primary" onClick={onClose} style={{ width: '100%', justifyContent: 'center', marginTop: 18 }}>
-          <CheckCircle size={15} /> Mengerti, coba lagi
-        </button>
       </motion.div>
     </motion.div>
   )
@@ -121,32 +100,43 @@ function DriveSetupModal({ onClose }) {
 
 export default function Sidebar() {
   const [driveConnected, setDriveConnected] = useState(false)
-  const [driveLoading, setDriveLoading] = useState(false)
+  const [driveLoading, setDriveLoading] = useState(true)
   const [showSetup, setShowSetup] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState(null)
-  const navigate = useNavigate()
-  const role = getRole()
-  const navItems = role === 'admin' ? ADMIN_NAV : DESIGNER_NAV
 
   useEffect(() => {
-    initGoogleAPI().catch(() => {})
-    
-    // Listen for PWA install prompt
-    const handleBeforeInstallPrompt = (e) => {
+    window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault()
       setDeferredPrompt(e)
-    }
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    })
+  }, [])
 
-    const checkInterval = setInterval(() => {
-      const status = isGoogleSignedIn()
-      if (status !== driveConnected) setDriveConnected(status)
-      if (driveLoading) setDriveLoading(false)
-    }, 1000)
+  useEffect(() => {
+    const checkDrive = async () => {
+      try {
+        await initGoogleAPI()
+        const signedIn = isGoogleSignedIn()
+        setDriveConnected(signedIn)
+      } catch (e) {
+        console.error('Drive init failed', e)
+        setDriveConnected(false)
+      } finally {
+        setDriveLoading(false)
+      }
+    }
+    checkDrive()
+
+    const tokenCheckInterval = setInterval(() => {
+      if (!driveLoading) {
+        const currentlyConnected = isGoogleSignedIn()
+        if (currentlyConnected !== driveConnected) {
+          setDriveConnected(currentlyConnected)
+        }
+      }
+    }, 5000)
 
     return () => {
-      clearInterval(checkInterval)
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+      clearInterval(tokenCheckInterval)
     }
   }, [driveConnected, driveLoading])
 
@@ -174,7 +164,6 @@ export default function Sidebar() {
       setDriveConnected(true)
     } catch (e) {
       console.error('Drive auth error:', e)
-      // Show setup instructions if invalid_client / no registered origin
       if (
         e.message?.includes('invalid_client') ||
         e.message?.includes('origin') ||
@@ -198,31 +187,27 @@ export default function Sidebar() {
         {/* ── Header / Logo ── */}
         <div style={{
           padding: '0 0 0 0',
-          background: role === 'admin'
-            ? 'linear-gradient(160deg, #071f18 0%, #041510 100%)'
-            : 'linear-gradient(160deg, #151f38 0%, #0d1527 100%)',
-          borderBottom: role === 'admin' ? '1px solid #134d37' : '1px solid #1e2d47',
+          background: 'linear-gradient(160deg, #151f38 0%, #0d1527 100%)',
+          borderBottom: '1px solid #1e2d47',
         }}>
           {/* Role badge strip */}
           <div style={{
             padding: '6px 14px',
-            background: role === 'admin'
-              ? 'linear-gradient(90deg, #10b98120, transparent)'
-              : 'linear-gradient(90deg, #6366f120, transparent)',
-            borderBottom: role === 'admin' ? '1px solid #0d3d2a' : '1px solid #1a2847',
+            background: 'linear-gradient(90deg, #6366f120, transparent)',
+            borderBottom: '1px solid #1a2847',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <div style={{
               width: 6, height: 6, borderRadius: '50%',
-              background: role === 'admin' ? '#10b981' : '#6366f1',
-              boxShadow: role === 'admin' ? '0 0 8px #10b981' : '0 0 8px #6366f1',
+              background: '#6366f1',
+              boxShadow: '0 0 8px #6366f1',
             }} />
             <span style={{
               fontSize: 9, fontWeight: 800, letterSpacing: 2,
               textTransform: 'uppercase',
-              color: role === 'admin' ? '#10b981' : '#818cf8',
+              color: '#818cf8',
             }}>
-              {role === 'admin' ? 'ADMIN PANEL' : 'DESIGNER PANEL'}
+              DESIGNER PANEL
             </span>
           </div>
 
@@ -234,10 +219,8 @@ export default function Sidebar() {
               style={{
                 width: 42, height: 42, borderRadius: 12, overflow: 'hidden',
                 flexShrink: 0,
-                boxShadow: role === 'admin'
-                  ? '0 0 16px rgba(16,185,129,0.35)'
-                  : '0 0 16px rgba(99,102,241,0.35)',
-                border: role === 'admin' ? '2px solid #10b98140' : '2px solid #6366f140',
+                boxShadow: '0 0 16px rgba(99,102,241,0.35)',
+                border: '2px solid #6366f140',
               }}
             >
               <img src="/logo.png" alt="Si Rekap" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -249,10 +232,10 @@ export default function Sidebar() {
               }}>Si Rekap</div>
               <div style={{
                 fontSize: 10, fontWeight: 600, marginTop: 2,
-                color: role === 'admin' ? '#6ee7b7' : '#a5b4fc',
+                color: '#a5b4fc',
                 letterSpacing: 0.3,
               }}>
-                {role === 'admin' ? 'Bhinneka Production' : 'Design Manager'}
+                Design Manager
               </div>
             </div>
           </div>
@@ -263,10 +246,10 @@ export default function Sidebar() {
           <span style={{
             display: 'block', fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
             textTransform: 'uppercase', padding: '8px 6px 6px',
-            color: role === 'admin' ? '#2d6a4f' : '#2d4068',
+            color: '#2d4068',
           }}>Menu Utama</span>
-          {navItems.map((item, i) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/admin'}>
+          {DESIGNER_NAV.map((item, i) => (
+            <NavLink key={item.to} to={item.to} end={item.to === '/'}>
               {({ isActive }) => (
                 <motion.div
                   className={`nav-item ${isActive ? 'active' : ''}`}
@@ -276,16 +259,10 @@ export default function Sidebar() {
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.97 }}
                   style={{
-                    color: isActive
-                      ? (role === 'admin' ? '#10b981' : '#818cf8')
-                      : (role === 'admin' ? '#6ee7b7' : '#94a3b8'),
-                    background: isActive
-                      ? (role === 'admin' ? 'rgba(16,185,129,0.12)' : 'rgba(99,102,241,0.12)')
-                      : 'transparent',
+                    color: isActive ? '#818cf8' : '#94a3b8',
+                    background: isActive ? 'rgba(99,102,241,0.12)' : 'transparent',
                     fontWeight: isActive ? 700 : 500,
-                    borderLeft: isActive
-                      ? `3px solid ${role === 'admin' ? '#10b981' : '#6366f1'}`
-                      : '3px solid transparent',
+                    borderLeft: isActive ? `3px solid #6366f1` : '3px solid transparent',
                     paddingLeft: 10,
                     borderRadius: 8,
                     marginBottom: 2,
@@ -356,37 +333,6 @@ export default function Sidebar() {
             </div>
             {driveConnected ? <LogOut size={14} style={{ color: 'var(--text-muted)' }} /> : <LogIn size={14} style={{ color: 'var(--accent)' }} />}
           </motion.div>
-
-          {/* User badge + Logout */}
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                  background: role === 'admin' ? 'linear-gradient(135deg, #10b981, #06b6d4)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 12, fontWeight: 800, color: 'white',
-                }}>
-                  {role === 'admin' ? '🛡️' : '🎨'}
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {role === 'admin' ? 'Admin' : 'Designer'}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Bhinneka Production</div>
-                </div>
-              </div>
-              <motion.button
-                onClick={() => { logout(); navigate('/login') }}
-                title="Logout"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 8, color: 'var(--text-muted)' }}
-                whileHover={{ color: 'var(--danger)', scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <LogOut size={15} />
-              </motion.button>
-            </div>
-          </div>
         </div>
       </motion.aside>
 

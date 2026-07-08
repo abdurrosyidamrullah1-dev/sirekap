@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { BarChart2, TrendingUp, Package, Calendar, Download, FileSpreadsheet, FileText, Printer, Store, DollarSign } from 'lucide-react'
 import { getOrders, supabase } from '../lib/supabase'
-import { getRole } from '../lib/auth'
 import * as XLSX from 'xlsx'
 import { jsPDF } from 'jspdf'
 import 'jspdf-autotable'
@@ -36,7 +35,7 @@ export default function Reports() {
     const load = async () => {
       setLoading(true)
       try {
-        const data = await getOrders({ role: getRole() })
+        const data = await getOrders({ role: 'designer' })
         setOrders(data)
       } catch (e) {
         toast.error('Gagal memuat laporan')
@@ -48,7 +47,7 @@ export default function Reports() {
 
     const channel = supabase
       .channel('public:orders:reports')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `order_role=eq.${getRole()}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `order_role=eq.designer` }, () => {
         load()
       })
       .subscribe()

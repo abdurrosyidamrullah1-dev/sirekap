@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, PlusCircle, ClipboardList, Filter } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getOrders, deleteOrder, supabase } from '../lib/supabase'
-import { getRole } from '../lib/auth'
 import OrderCard from '../components/OrderCard'
 import toast from 'react-hot-toast'
 
@@ -28,7 +27,7 @@ export default function Orders() {
   const fetchOrders = async () => {
     setLoading(true)
     try {
-      const data = await getOrders({ status, search, role: getRole() })
+      const data = await getOrders({ status, search, role: 'designer' })
       setOrders(data)
     } catch (e) {
       toast.error('Gagal memuat orderan')
@@ -42,7 +41,7 @@ export default function Orders() {
 
     const channel = supabase
       .channel('public:orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `order_role=eq.${getRole()}` }, () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `order_role=eq.designer` }, () => {
         fetchOrders()
       })
       .subscribe()

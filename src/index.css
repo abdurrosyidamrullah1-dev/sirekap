@@ -87,10 +87,10 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   DESIGNER THEME (default — blue/indigo)
-   Applied when: data-role="designer" OR no role
+/* ═══════════════════════════════════════════════════════════════════
+   DESIGNER THEME (default)
 ═══════════════════════════════════════════════════════════════════ */
-:root[data-role="designer"], :root:not([data-role]) {
+:root {
   --role-accent:        #6366f1;
   --role-accent-2:      #8b5cf6;
   --role-accent-light:  rgba(99,102,241,0.1);
@@ -101,48 +101,6 @@
   --role-badge-bg:      linear-gradient(135deg, #6366f1, #8b5cf6);
   --role-header-glow:   rgba(99,102,241,0.3);
 }
-
-/* ═══════════════════════════════════════════════════════════════════
-   ADMIN THEME — Emerald Green / Teal
-   Applied when: data-role="admin"
-═══════════════════════════════════════════════════════════════════ */
-:root[data-role="admin"] {
-  /* Override accent to green */
-  --accent:             #10b981;
-  --accent-hover:       #059669;
-  --accent-light:       rgba(16,185,129,0.1);
-  --accent-glow:        rgba(16,185,129,0.25);
-  --border-focus:       #10b981;
-  --shadow-blue:        0 4px 24px rgba(16,185,129,0.3);
-
-  /* Role-specific */
-  --role-accent:        #10b981;
-  --role-accent-2:      #06b6d4;
-  --role-accent-light:  rgba(16,185,129,0.1);
-  --role-sidebar-bg:    #061a14;
-  --role-sidebar-top:   linear-gradient(160deg, #071f18 0%, #041510 100%);
-  --role-nav-active:    rgba(16,185,129,0.15);
-  --role-nav-active-border: #10b981;
-  --role-badge-bg:      linear-gradient(135deg, #10b981, #06b6d4);
-  --role-header-glow:   rgba(16,185,129,0.3);
-
-  /* Full override for dark bg even in light mode */
-  --bg-primary:         #071a13;
-  --bg-secondary:       #0a2218;
-  --bg-tertiary:        #0e2b1f;
-  --bg-card:            #0d2218;
-  --bg-sidebar:         #061510;
-
-  --text-primary:       #ecfdf5;
-  --text-secondary:     #6ee7b7;
-  --text-muted:         #2d6a4f;
-
-  --border:             #134d37;
-  --shadow-sm:          0 1px 3px rgba(0,0,0,.4);
-  --shadow-md:          0 4px 16px rgba(0,0,0,.5);
-  --shadow-lg:          0 10px 40px rgba(0,0,0,.6);
-}
-
 
 /* ─── Reset & Base ───────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
