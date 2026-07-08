@@ -1,17 +1,19 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Package, FolderOpen, CheckCircle2, Clock,
   AlertCircle, Plus, X, Save, Edit2, Trash2, Info,
-  FileText as FileTab, History, Workflow, Printer, Store
+  FileText as FileTab, Workflow, Printer, Store,
+  MessageCircle, Download, Receipt, Send
 } from 'lucide-react'
 import {
   getOrderById, updateOrder, updateOrderItem, deleteOrderItem,
-  addOrderItem, getStatusConfig, ORDER_STATUSES, supabase
+  addOrderItem, getStatusConfig, ORDER_STATUSES, supabase, deleteOrder
 } from '../lib/supabase'
 import FileManager from '../components/FileManager'
 import WorkflowTracker from '../components/WorkflowTracker'
+import InvoiceTemplate from '../components/InvoiceTemplate'
 import toast from 'react-hot-toast'
 
 const ITEM_STATUS = [
@@ -22,6 +24,7 @@ const ITEM_STATUS = [
 
 const TABS = [
   { key: 'info',     label: 'Info & Item',   icon: Info },
+  { key: 'invoice',  label: 'Invoice',        icon: Receipt },
   { key: 'files',    label: 'File Manager',  icon: FolderOpen },
   { key: 'workflow', label: 'Workflow',      icon: Workflow },
 ]
@@ -37,6 +40,8 @@ export default function OrderDetail() {
   const [addingItem, setAddingItem] = useState(false)
   const [newItem, setNewItem] = useState({ item_name: '', quantity: 1, notes: '', production_type: 'in_house', production_location: 'Mesin A3' })
   const [saving, setSaving] = useState(false)
+  const [deletingOrder, setDeletingOrder] = useState(false)
+  const invoiceRef = useRef(null)
 
   const load = async () => {
     try {
@@ -123,15 +128,76 @@ export default function OrderDetail() {
     }))
   }
 
-  const handleStatusChanged = (newStatus) => {
-    setOrder(prev => ({
-      ...prev,
-      status: newStatus,
-      order_timeline: [
-        ...(prev.order_timeline || []),
-        { id: Date.now(), status: newStatus, note: '', created_at: new Date().toISOString() }
-      ]
-    }))
+  const handleDeleteOrder = async () => {
+    if (!confirm(`Hapus orderan "${order.customer_name}"? Tindakan ini tidak bisa dibatalkan.`)) return
+    setDeletingOrder(true)
+    try {
+      await deleteOrder(id)
+      toast.success('Orderan berhasil dihapus!')
+      navigate('/orders')
+    } catch {
+      toast.error('Gagal menghapus orderan')
+      setDeletingOrder(false)
+    }
+  }
+
+  const handleSendWA = () => {
+    const phone = order.customer_phone?.replace(/[^0-9]/g, '') || ''
+    const items = order.order_items || []
+    const total = items.reduce((s, it) => s + ((it.unit_price || 0) * (it.quantity || 1)), 0)
+    const itemList = items.map((it, i) =>
+      `${i + 1}. ${it.item_name} (${it.quantity}x) — Rp ${(((it.unit_price || 0) * (it.quantity || 1))).toLocaleString('id-ID')}`
+    ).join('\n')
+
+    const msg = [
+      `Halo ${order.customer_name}, berikut detail invoice pesanan Anda di Bhinneka Production:`,
+      ``,
+      `📋 *INVOICE*`,
+      `Tanggal: ${new Date(order.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
+      ``,
+      `*Daftar Pesanan:*`,
+      itemList,
+      ``,
+      total > 0 ? `*Total: Rp ${total.toLocaleString('id-ID')}*` : '',
+      ``,
+      `Pembayaran via Transfer BCA: *5490327187* a/n Saputra Malik`,
+      ``,
+      `Terima kasih sudah mempercayai Bhinneka Production! 🙏`,
+    ].filter(Boolean).join('\n')
+
+    const waUrl = phone
+      ? `https://wa.me/62${phone.replace(/^0/, '')}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`
+    window.open(waUrl, '_blank')
+  }
+
+  const handleDownloadInvoice = async () => {
+    const el = document.getElementById('invoice-print-area')
+    if (!el) { toast.error('Invoice tidak ditemukan'); return }
+    try {
+      toast.loading('Membuat PDF...')
+      const { default: html2canvas } = await import('html2canvas-pro')
+      const { jsPDF } = await import('jspdf')
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#fff' })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const imgProps = pdf.getImageProperties(imgData)
+      const imgHeight = (imgProps.height * pageWidth) / imgProps.width
+      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, Math.min(imgHeight, pageHeight))
+      pdf.save(`Invoice_${order.customer_name}_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.pdf`)
+      toast.dismiss()
+      toast.success('Invoice berhasil didownload!')
+    } catch (e) {
+      toast.dismiss()
+      toast.error('Gagal download invoice')
+      console.error(e)
+    }
+  }
+
+  const handlePrintInvoice = () => {
+    window.print()
   }
 
   const formatDate = (d) => {
@@ -251,7 +317,7 @@ export default function OrderDetail() {
             </div>
 
             {/* Right: Actions */}
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               {editMode ? (
                 <>
                   <button className="btn btn-secondary btn-sm" onClick={() => setEditMode(false)}><X size={14} /> Batal</button>
@@ -269,6 +335,15 @@ export default function OrderDetail() {
                   <button className="btn btn-secondary btn-sm" onClick={() => setEditMode(true)}>
                     <Edit2 size={14} /> Edit
                   </button>
+                  <motion.button
+                    className="btn btn-sm"
+                    style={{ background: '#ef4444', color: 'white', border: 'none' }}
+                    onClick={handleDeleteOrder}
+                    disabled={deletingOrder}
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  >
+                    <Trash2 size={14} /> Hapus
+                  </motion.button>
                 </>
               )}
             </div>
@@ -525,6 +600,71 @@ export default function OrderDetail() {
           </motion.div>
         )}
 
+
+        {/* ── INVOICE TAB ── */}
+        {tab === 'invoice' && (
+          <motion.div
+            key="invoice"
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+          >
+            {/* Action bar */}
+            <div className="no-print card" style={{ marginBottom: 16 }}>
+              <div className="card-body" style={{ padding: '14px 20px' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <div style={{ flex: 1, fontSize: 13, color: 'var(--text-muted)' }}>
+                    <Receipt size={14} style={{ display: 'inline', marginRight: 6, color: 'var(--accent)' }} />
+                    Preview invoice siap. Pilih aksi:
+                  </div>
+                  <motion.button
+                    className="btn"
+                    style={{ background: '#25d366', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: 7 }}
+                    onClick={handleSendWA}
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  >
+                    <MessageCircle size={16} /> Kirim WA
+                  </motion.button>
+                  <motion.button
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 7 }}
+                    onClick={handleDownloadInvoice}
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  >
+                    <Download size={16} /> Download PDF
+                  </motion.button>
+                  <motion.button
+                    className="btn btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 7 }}
+                    onClick={handlePrintInvoice}
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  >
+                    <Printer size={16} /> Print
+                  </motion.button>
+                  <motion.button
+                    className="btn"
+                    style={{ background: '#ef4444', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: 7 }}
+                    onClick={handleDeleteOrder}
+                    disabled={deletingOrder}
+                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
+                  >
+                    <Trash2 size={16} /> Hapus
+                  </motion.button>
+                </div>
+                <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+                  💡 <strong>Kirim WA:</strong> Akan membuka WhatsApp dengan teks tagihan yang sudah terisi. Kamu bisa lampirkan PDF yang sudah didownload secara manual.
+                </div>
+              </div>
+            </div>
+
+            {/* Invoice Preview */}
+            <div style={{ overflowX: 'auto', background: 'var(--bg-tertiary)', borderRadius: 16, padding: 24 }}>
+              <div style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.3)', borderRadius: 8, display: 'inline-block', minWidth: '794px' }}>
+                <InvoiceTemplate ref={invoiceRef} order={order} />
+              </div>
+            </div>
+          </motion.div>
+        )}
+
         {/* ── FILES TAB ── */}
         {tab === 'files' && (
           <motion.div
@@ -573,7 +713,16 @@ export default function OrderDetail() {
                 </div>
               </div>
               <div className="card-body">
-                <WorkflowTracker order={order} onStatusChanged={handleStatusChanged} />
+                <WorkflowTracker order={order} onStatusChanged={(newStatus) => {
+                  setOrder(prev => ({
+                    ...prev,
+                    status: newStatus,
+                    order_timeline: [
+                      ...(prev.order_timeline || []),
+                      { id: Date.now(), status: newStatus, note: '', created_at: new Date().toISOString() }
+                    ]
+                  }))
+                }} />
               </div>
             </div>
           </motion.div>

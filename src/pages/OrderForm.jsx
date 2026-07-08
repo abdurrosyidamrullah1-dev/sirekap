@@ -5,7 +5,7 @@ import { Plus, Trash2, Package, User, Calendar, FileText, ChevronRight, Save, Ar
 import { createOrder, ORDER_STATUSES, getStatusConfig } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-const EMPTY_ITEM = { item_name: '', quantity: 1, notes: '', status: 'pending', production_type: 'in_house', production_location: 'Mesin A3' }
+const EMPTY_ITEM = { item_name: '', quantity: 1, unit_price: 0, notes: '', status: 'pending', production_type: 'in_house', production_location: 'Mesin A3' }
 
 export default function OrderForm() {
   const navigate = useNavigate()
@@ -14,6 +14,7 @@ export default function OrderForm() {
 
   const [form, setForm] = useState({
     customer_name: '',
+    customer_phone: '',
     status: 'pending',
     deadline: '',
     notes: '',
@@ -149,10 +150,19 @@ export default function OrderForm() {
                   <label className="form-label">Nama Customer *</label>
                   <input
                     className="form-input"
-                    placeholder="Contoh: Brin, Aldi, PT. Maju..."
+                    placeholder="Contoh: Bapak Roni, PT. Maju..."
                     value={form.customer_name}
                     onChange={e => updateForm('customer_name', e.target.value)}
                     autoFocus
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">No. HP / WhatsApp</label>
+                  <input
+                    className="form-input"
+                    placeholder="Contoh: 08123456789"
+                    value={form.customer_phone}
+                    onChange={e => updateForm('customer_phone', e.target.value)}
                   />
                 </div>
                 <div className="form-group">
@@ -218,9 +228,10 @@ export default function OrderForm() {
             </div>
             <div className="card-body">
               {/* Column header */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 1fr 36px', gap: 10, padding: '0 4px', marginBottom: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px 1fr 36px', gap: 10, padding: '0 4px', marginBottom: 8 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Nama Item</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Qty</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Harga Satuan</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Catatan</span>
                 <span></span>
               </div>
@@ -236,7 +247,7 @@ export default function OrderForm() {
                     transition={{ type: 'spring', stiffness: 300, damping: 25 }}
                     style={{ display: 'block', background: 'var(--bg-tertiary)', padding: 12, borderRadius: 12, marginBottom: 12, border: '1px solid var(--border)' }}
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 80px 1fr 36px', gap: 10, marginBottom: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px 1fr 36px', gap: 10, marginBottom: 12 }}>
                       <input
                         className="form-input"
                         placeholder={`Item ${i+1} (cth: tumbler, kaos...)`}
@@ -250,6 +261,18 @@ export default function OrderForm() {
                         value={item.quantity}
                         onChange={e => updateItem(i, 'quantity', parseInt(e.target.value) || 1)}
                       />
+                      <div style={{ position: 'relative' }}>
+                        <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>Rp</span>
+                        <input
+                          type="number"
+                          className="form-input"
+                          min="0"
+                          style={{ paddingLeft: 32 }}
+                          placeholder="0"
+                          value={item.unit_price || ''}
+                          onChange={e => updateItem(i, 'unit_price', parseInt(e.target.value) || 0)}
+                        />
+                      </div>
                       <input
                         className="form-input"
                         placeholder="Catatan..."

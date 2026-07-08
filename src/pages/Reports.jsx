@@ -28,6 +28,8 @@ export default function Reports() {
     return d.toISOString().split('T')[0]
   })
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0])
+  const [filterStatus, setFilterStatus] = useState('all')
+  const [filterCustomer, setFilterCustomer] = useState('')
 
   useEffect(() => {
     const load = async () => {
@@ -57,8 +59,16 @@ export default function Reports() {
 
   const filtered = orders.filter(o => {
     const d = new Date(o.created_at)
-    return d >= new Date(dateFrom) && d <= new Date(dateTo + 'T23:59:59')
+    const inDate = d >= new Date(dateFrom) && d <= new Date(dateTo + 'T23:59:59')
+    const inStatus = filterStatus === 'all' || o.status === filterStatus
+    const inCustomer = !filterCustomer.trim() ||
+      o.customer_name.toLowerCase().includes(filterCustomer.toLowerCase())
+    return inDate && inStatus && inCustomer
   })
+
+  const totalRevenue = filtered
+    .flatMap(o => o.order_items || [])
+    .reduce((s, it) => s + ((it.unit_price || 0) * (it.quantity || 1)), 0)
 
   // Pie data
   const statusCounts = ['pending','in_progress','done','cancelled'].map(s => ({
@@ -238,16 +248,41 @@ export default function Reports() {
       >
         <div className="card-body" style={{ padding: '16px 24px' }}>
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 160 }}>
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 140 }}>
               <label className="form-label">Dari Tanggal</label>
               <input type="date" className="form-input" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
             </div>
-            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 160 }}>
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 140 }}>
               <label className="form-label">Sampai Tanggal</label>
               <input type="date" className="form-input" value={dateTo} onChange={e => setDateTo(e.target.value)} />
             </div>
-            <div style={{ padding: '10px 18px', background: 'var(--accent-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontWeight: 700, color: 'var(--accent)', fontSize: 15 }}>
-              {filtered.length} Orderan
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 130 }}>
+              <label className="form-label">Status</label>
+              <select className="form-select" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+                <option value="all">Semua Status</option>
+                {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: 0, flex: 1, minWidth: 140 }}>
+              <label className="form-label">Customer</label>
+              <input
+                className="form-input"
+                placeholder="Cari nama customer..."
+                value={filterCustomer}
+                onChange={e => setFilterCustomer(e.target.value)}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ padding: '10px 18px', background: 'var(--accent-light)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', fontWeight: 700, color: 'var(--accent)', fontSize: 15 }}>
+                {filtered.length} Orderan
+              </div>
+              {totalRevenue > 0 && (
+                <div style={{ padding: '10px 18px', background: 'rgba(16,185,129,0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16,185,129,0.3)', fontWeight: 700, color: '#10b981', fontSize: 14 }}>
+                  Rp {totalRevenue.toLocaleString('id-ID')}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,12 +1,21 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, Layers, LogOut, LogIn, HardDrive, AlertCircle, X, CheckCircle, FolderOpen } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, HardDrive, AlertCircle, X, CheckCircle, FolderOpen, ShieldCheck } from 'lucide-react'
 import { isGoogleSignedIn, signInToGoogle, signOutGoogle, initGoogleAPI } from '../lib/drive'
+import { getRole, logout } from '../lib/auth'
 import { useState, useEffect } from 'react'
 import { MonitorDown } from 'lucide-react'
 
-const navItems = [
+const DESIGNER_NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/orders', icon: ClipboardList, label: 'Semua Orderan' },
+  { to: '/orders/new', icon: PlusCircle, label: 'Tambah Orderan' },
+  { to: '/drive', icon: FolderOpen, label: 'Drive Manager' },
+  { to: '/reports', icon: BarChart2, label: 'Laporan' },
+]
+
+const ADMIN_NAV = [
+  { to: '/admin', icon: ShieldCheck, label: 'Admin Dashboard' },
   { to: '/orders', icon: ClipboardList, label: 'Semua Orderan' },
   { to: '/orders/new', icon: PlusCircle, label: 'Tambah Orderan' },
   { to: '/drive', icon: FolderOpen, label: 'Drive Manager' },
@@ -115,6 +124,9 @@ export default function Sidebar() {
   const [driveLoading, setDriveLoading] = useState(false)
   const [showSetup, setShowSetup] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const navigate = useNavigate()
+  const role = getRole()
+  const navItems = role === 'admin' ? ADMIN_NAV : DESIGNER_NAV
 
   useEffect(() => {
     initGoogleAPI().catch(() => {})
@@ -290,6 +302,37 @@ export default function Sidebar() {
             </div>
             {driveConnected ? <LogOut size={14} style={{ color: 'var(--text-muted)' }} /> : <LogIn size={14} style={{ color: 'var(--accent)' }} />}
           </motion.div>
+
+          {/* User badge + Logout */}
+          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
+                  background: role === 'admin' ? 'linear-gradient(135deg, #10b981, #06b6d4)' : 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 800, color: 'white',
+                }}>
+                  {role === 'admin' ? '🛡️' : '🎨'}
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
+                    {role === 'admin' ? 'Admin' : 'Designer'}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Bhinneka Production</div>
+                </div>
+              </div>
+              <motion.button
+                onClick={() => { logout(); navigate('/login') }}
+                title="Logout"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, borderRadius: 8, color: 'var(--text-muted)' }}
+                whileHover={{ color: 'var(--danger)', scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <LogOut size={15} />
+              </motion.button>
+            </div>
+          </div>
         </div>
       </motion.aside>
 
