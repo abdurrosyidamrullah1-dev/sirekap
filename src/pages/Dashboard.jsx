@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, TrendingUp, Package, Clock, CheckCircle2, PlusCircle, ArrowRight } from 'lucide-react'
+import { LayoutDashboard, TrendingUp, Package, Clock, CheckCircle2, PlusCircle, ArrowRight, Zap, FolderOpen, Bell, Calendar } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { getOrders, getOrderStats, supabase, getStatusConfig } from '../lib/supabase'
 import StatCard from '../components/StatCard'
@@ -70,6 +70,13 @@ export default function Dashboard() {
 
   const formatDate = (d) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 11) return 'Selamat Pagi'
+    if (hour < 15) return 'Selamat Siang'
+    if (hour < 18) return 'Selamat Sore'
+    return 'Selamat Malam'
+  }
 
   if (loading) return (
     <div className="page-container">
@@ -101,19 +108,95 @@ export default function Dashboard() {
         transition={{ delay: 0.05 }}
       >
         <div className="page-header-left">
-          <h1>Dashboard 👋</h1>
-          <p>Selamat datang! Ini ringkasan orderan kamu hari ini.</p>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.5 }}>{getGreeting()}, Rekan Kreatif! 🎨</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, color: 'var(--text-secondary)' }}>
+            <Calendar size={14} style={{ color: 'var(--accent)' }} />
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            </span>
+            <span style={{ opacity: 0.5 }}>•</span>
+            <span style={{ fontSize: 13 }}>
+              {stats?.pending > 0 
+                ? `🔥 Semangat! Ada ${stats.pending} orderan menunggu sentuhanmu.` 
+                : '✨ Saat ini antrean kosong. Waktunya ngopi atau eksplor referensi baru!'}
+            </span>
+          </div>
         </div>
-        <motion.button
-          className="btn btn-primary"
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          onClick={() => navigate('/orders/new')}
-        >
-          <PlusCircle size={16} />
-          Tambah Orderan
-        </motion.button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <motion.button
+            className="btn btn-secondary"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => navigate('/orders')}
+          >
+            <FolderOpen size={16} /> Semua Data
+          </motion.button>
+          <motion.button
+            className="btn btn-primary"
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
+            onClick={() => navigate('/orders/new')}
+            style={{ background: 'linear-gradient(135deg, var(--blue-500), var(--blue-600))', border: 'none', boxShadow: 'var(--shadow-blue)' }}
+          >
+            <PlusCircle size={16} />
+            Order Baru
+          </motion.button>
+        </div>
       </motion.div>
+
+      {/* Quick Actions (Baru) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 28 }}>
+        <motion.div
+          className="card"
+          whileHover={{ y: -4, boxShadow: 'var(--shadow-md)' }}
+          onClick={() => navigate('/orders/new')}
+          style={{ cursor: 'pointer', padding: 20, background: 'linear-gradient(135deg, rgba(59,130,246,0.05), rgba(99,102,241,0.1))', border: '1px solid rgba(99,102,241,0.15)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--blue-500)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(59,130,246,0.3)' }}>
+              <Zap size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--blue-700)' }}>Buat Orderan Cepat</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Input pesanan pelanggan baru</div>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="card"
+          whileHover={{ y: -4, boxShadow: 'var(--shadow-md)' }}
+          onClick={() => navigate('/reports')}
+          style={{ cursor: 'pointer', padding: 20, background: 'linear-gradient(135deg, rgba(16,185,129,0.05), rgba(52,211,153,0.1))', border: '1px solid rgba(16,185,129,0.15)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(16,185,129,0.3)' }}>
+              <TrendingUp size={20} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#047857' }}>Rekap Pendapatan</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Lihat statistik bulan ini</div>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="card"
+          whileHover={{ y: -4, boxShadow: 'var(--shadow-md)' }}
+          onClick={() => navigate('/orders?status=revision')}
+          style={{ cursor: 'pointer', padding: 20, background: 'linear-gradient(135deg, rgba(245,158,11,0.05), rgba(251,191,36,0.1))', border: '1px solid rgba(245,158,11,0.15)' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--warning)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(245,158,11,0.3)' }}>
+              <Bell size={20} className={stats?.revision > 0 ? "animate-pulse-badge" : ""} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 15, color: '#b45309' }}>Cek Revisi</div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{stats?.revision > 0 ? `Ada ${stats.revision} orderan minta revisi` : 'Tidak ada revisi aktif'}</div>
+            </div>
+          </div>
+        </motion.div>
+      </div>
 
       {/* Stats */}
       <div className="stat-grid" style={{ marginBottom: 28 }}>
@@ -191,8 +274,12 @@ export default function Dashboard() {
           <div style={{ padding: '8px 0' }}>
             <AnimatePresence>
               {recentOrders.length === 0 ? (
-                <div className="empty-state" style={{ padding: '30px 24px' }}>
-                  <p>Belum ada orderan</p>
+                <div className="empty-state" style={{ padding: '40px 24px', textAlign: 'center' }}>
+                  <div style={{ width: 64, height: 64, borderRadius: '50%', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+                    <LayoutDashboard size={28} style={{ color: 'var(--text-muted)' }} />
+                  </div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>Belum Ada Pergerakan</h3>
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>Santai dulu, atau mulai hari ini dengan<br/>menambahkan orderan baru ke sistem.</p>
                 </div>
               ) : recentOrders.map((order, i) => {
                 const cfg = getStatusConfig(order.status)

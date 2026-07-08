@@ -51,7 +51,7 @@ export default function OrderCard({ order, index = 0 }) {
         )}
       </td>
       <td>
-        <span className={`badge badge-${order.status}`} style={{ background: cfg.color + '20', color: cfg.color }}>
+        <span className={`badge badge-${order.status} ${order.status === 'pending' || order.status === 'revision' ? 'animate-pulse-badge' : ''}`} style={{ background: cfg.color + '20', color: cfg.color }}>
           {cfg.label}
         </span>
       </td>
