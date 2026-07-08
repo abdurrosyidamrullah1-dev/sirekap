@@ -116,7 +116,7 @@ export default function AdminOrderForm() {
 
     setLoading(true)
     try {
-      const orderData = { ...form, status: 'pending' }
+      const orderData = { ...form, status: 'pending', order_role: 'admin' }
       const order = await createOrder(orderData, validItems.map(it => ({
         item_name: it.item_name,
         quantity: it.quantity,

@@ -19,6 +19,7 @@ CREATE TABLE orders (
   notes            TEXT,
   drive_folder_id  TEXT,
   drive_folder_url TEXT,
+  order_role       TEXT NOT NULL DEFAULT 'designer' CHECK (order_role IN ('admin', 'designer')),
   created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -82,6 +83,7 @@ CREATE POLICY "allow all timeline"  ON order_timeline FOR ALL USING (true) WITH 
 
 -- ─── 7. Indexes ────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_orders_status      ON orders(status);
+CREATE INDEX IF NOT EXISTS idx_orders_role        ON orders(order_role);
 CREATE INDEX IF NOT EXISTS idx_orders_created     ON orders(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_items_order_id     ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_files_order_id     ON order_files(order_id);

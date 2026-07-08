@@ -52,8 +52,8 @@ export default function AdminDashboard() {
     const load = async () => {
       try {
         const [statRes, ordersRes] = await Promise.all([
-          getOrderStats(),
-          getOrders()
+          getOrderStats('admin'),
+          getOrders({ role: 'admin' })
         ])
         setStats(statRes.stats)
         setChartData(statRes.chartData.map(d => ({
@@ -72,7 +72,7 @@ export default function AdminDashboard() {
 
     const channel = supabase
       .channel('public:orders:admin-dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: 'order_role=eq.admin' }, () => load())
       .subscribe()
     return () => supabase.removeChannel(channel)
   }, [])

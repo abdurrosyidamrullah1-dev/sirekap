@@ -28,6 +28,7 @@ export const getOrders = async (filters = {}) => {
 
   if (filters.status && filters.status !== 'all') query = query.eq('status', filters.status)
   if (filters.search) query = query.ilike('customer_name', `%${filters.search}%`)
+  if (filters.role) query = query.eq('order_role', filters.role)
 
   const { data, error } = await query
   if (error) throw error
@@ -142,8 +143,10 @@ export const getTimeline = async (orderId) => {
 }
 
 // ─── Reports / Stats ──────────────────────────────────────────────────────────
-export const getOrderStats = async () => {
-  const { data, error } = await supabase.from('orders').select('status, created_at')
+export const getOrderStats = async (role = null) => {
+  let query = supabase.from('orders').select('status, created_at')
+  if (role) query = query.eq('order_role', role)
+  const { data, error } = await query
   if (error) throw error
 
   const stats = {

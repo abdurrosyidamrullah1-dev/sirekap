@@ -52,7 +52,8 @@ export default function OrderForm() {
 
     setLoading(true)
     try {
-      const order = await createOrder(form, validItems)
+      const orderData = { ...form, order_role: 'designer' }
+      const order = await createOrder(orderData, validItems)
       toast.success('Orderan berhasil ditambahkan! 🎉')
       navigate(`/orders/${order.id}`)
     } catch (e) {
