@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, Layers, LogOut, LogIn, HardDrive, AlertCircle, X, CheckCircle, FolderOpen, Bot } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, Layers, LogOut, LogIn, HardDrive, AlertCircle, X, CheckCircle, FolderOpen } from 'lucide-react'
 import { isGoogleSignedIn, signInToGoogle, signOutGoogle, initGoogleAPI } from '../lib/drive'
 import { useState, useEffect } from 'react'
 import { MonitorDown } from 'lucide-react'
@@ -9,7 +9,6 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/orders', icon: ClipboardList, label: 'Semua Orderan' },
   { to: '/orders/new', icon: PlusCircle, label: 'Tambah Orderan' },
-  { to: '/ai', icon: Bot, label: 'AI Assistant' },
   { to: '/drive', icon: FolderOpen, label: 'Drive Manager' },
   { to: '/reports', icon: BarChart2, label: 'Laporan' },
 ]
