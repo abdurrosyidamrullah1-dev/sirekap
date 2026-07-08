@@ -5,7 +5,7 @@ import { Plus, Trash2, Package, User, Calendar, FileText, ChevronRight, Save, Ar
 import { createOrder, ORDER_STATUSES, getStatusConfig } from '../lib/supabase'
 import toast from 'react-hot-toast'
 
-const EMPTY_ITEM = { item_name: '', quantity: 1, unit_price: 0, notes: '', status: 'pending', production_type: 'in_house', production_location: 'Mesin A3' }
+const EMPTY_ITEM = { item_name: '', quantity: 1, notes: '', status: 'pending' }
 
 export default function OrderForm() {
   const navigate = useNavigate()
@@ -52,11 +52,17 @@ export default function OrderForm() {
     setLoading(true)
     try {
       const orderData = { ...form, order_role: 'designer' }
-      const order = await createOrder(orderData, validItems)
+      const itemsToInsert = validItems.map(it => ({
+        item_name: it.item_name,
+        quantity: it.quantity,
+        notes: it.notes,
+        status: it.status || 'pending',
+      }))
+      const order = await createOrder(orderData, itemsToInsert)
       toast.success('Orderan berhasil ditambahkan! 🎉')
       navigate(`/orders/${order.id}`)
     } catch (e) {
-      toast.error('Gagal menyimpan orderan')
+      toast.error('Gagal menyimpan: ' + (e.message || 'Error tidak diketahui'))
       console.error(e)
     } finally {
       setLoading(false)
