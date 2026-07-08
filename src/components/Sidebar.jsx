@@ -223,7 +223,7 @@ export default function Sidebar() {
                 border: '2px solid #6366f140',
               }}
             >
-              <img src="/logo.png" alt="Si Rekap" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <img src="/icon.svg" alt="Si Rekap" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </motion.div>
             <div>
               <div style={{
