@@ -14,7 +14,51 @@ import {
 import FileManager from '../components/FileManager'
 import WorkflowTracker from '../components/WorkflowTracker'
 import InvoiceTemplate from '../components/InvoiceTemplate'
+import { isGoogleSignedIn, getAccessToken } from '../lib/drive'
 import toast from 'react-hot-toast'
+
+// ─── Upload invoice PDF ke Drive (folder perbulan) ────────────────────────────
+async function uploadInvoiceToDrive(pdfBlob, customerName, invoiceDate) {
+  const token = getAccessToken()
+  if (!token) return null
+
+  const monthFolder = new Date(invoiceDate).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+  const rootName = 'Invoice Bhinneka Production'
+
+  const search = async (q) => {
+    const url = new URL('https://www.googleapis.com/drive/v3/files')
+    url.searchParams.set('q', q); url.searchParams.set('fields', 'files(id,name)'); url.searchParams.set('spaces', 'drive')
+    const r = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } })
+    if (!r.ok) return []
+    return (await r.json()).files || []
+  }
+  const mkDir = async (name, parentId) => {
+    const body = { name, mimeType: 'application/vnd.google-apps.folder' }
+    if (parentId) body.parents = [parentId]
+    const r = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    return (await r.json()).id
+  }
+
+  const roots = await search(`name='${rootName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`)
+  const rootId = roots.length > 0 ? roots[0].id : await mkDir(rootName, null)
+
+  const months = await search(`'${rootId}' in parents and name='${monthFolder}' and mimeType='application/vnd.google-apps.folder' and trashed=false`)
+  const monthId = months.length > 0 ? months[0].id : await mkDir(monthFolder, rootId)
+
+  const fileName = `Invoice_${customerName}_${new Date(invoiceDate).toLocaleDateString('id-ID').replace(/\//g, '-')}.pdf`
+  const form = new FormData()
+  form.append('metadata', new Blob([JSON.stringify({ name: fileName, parents: [monthId] })], { type: 'application/json' }))
+  form.append('file', pdfBlob, fileName)
+
+  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name', {
+    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
+  })
+  return res.ok ? await res.json() : null
+}
 
 const ITEM_STATUS = [
   { value: 'pending',     label: 'Pending',  icon: Clock,         color: 'var(--warning)' },
@@ -186,9 +230,23 @@ export default function OrderDetail() {
       const imgProps = pdf.getImageProperties(imgData)
       const imgHeight = (imgProps.height * pageWidth) / imgProps.width
       pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, Math.min(imgHeight, pageHeight))
+      // Download ke browser
       pdf.save(`Invoice_${order.customer_name}_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.pdf`)
       toast.dismiss()
       toast.success('Invoice berhasil didownload!')
+
+      // Auto-upload ke Google Drive (folder perbulan) kalau sudah login
+      if (isGoogleSignedIn()) {
+        toast.loading('Mengupload ke Google Drive...', { id: 'drive-upload' })
+        try {
+          const pdfBlob = pdf.output('blob')
+          const result = await uploadInvoiceToDrive(pdfBlob, order.customer_name, order.created_at)
+          toast.dismiss('drive-upload')
+          if (result) toast.success(`Invoice tersimpan ke Drive! 📁`, { duration: 4000 })
+        } catch {
+          toast.dismiss('drive-upload')
+        }
+      }
     } catch (e) {
       toast.dismiss()
       toast.error('Gagal download invoice')

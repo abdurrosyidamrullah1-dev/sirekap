@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import Orders from './pages/Orders'
 import OrderForm from './pages/OrderForm'
+import AdminOrderForm from './pages/AdminOrderForm'
 import OrderDetail from './pages/OrderDetail'
 import Reports from './pages/Reports'
 import DriveManager from './pages/DriveManager'
@@ -31,7 +32,7 @@ function AnimatedRoutes() {
         <Route path="/"             element={<ProtectedRoute>{role === 'admin' ? <AdminDashboard /> : <Dashboard />}</ProtectedRoute>} />
         <Route path="/admin"        element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
         <Route path="/orders"       element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-        <Route path="/orders/new"   element={<ProtectedRoute><OrderForm /></ProtectedRoute>} />
+        <Route path="/orders/new"   element={<ProtectedRoute>{role === 'admin' ? <AdminOrderForm /> : <OrderForm />}</ProtectedRoute>} />
         <Route path="/orders/:id"   element={<ProtectedRoute><OrderDetail /></ProtectedRoute>} />
         <Route path="/drive"        element={<ProtectedRoute><DriveManager /></ProtectedRoute>} />
         <Route path="/reports"      element={<ProtectedRoute><Reports /></ProtectedRoute>} />

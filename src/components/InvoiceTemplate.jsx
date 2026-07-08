@@ -125,6 +125,9 @@ const InvoiceTemplate = forwardRef(function InvoiceTemplate({ order }, ref) {
         {order.customer_phone && (
           <div style={{ fontSize: 12, color: '#555' }}>📱 {order.customer_phone}</div>
         )}
+        {order.customer_address && (
+          <div style={{ fontSize: 12, color: '#555' }}>📍 {order.customer_address}</div>
+        )}
         {order.notes && (
           <div style={{ fontSize: 12, color: '#555', marginTop: 4, fontStyle: 'italic' }}>
             Catatan: {order.notes}

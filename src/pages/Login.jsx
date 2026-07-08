@@ -11,16 +11,16 @@ const ACCOUNTS = [
     icon: Palette,
     color: '#6366f1',
     gradient: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-    password: 'designer123',
+    password: '123',
   },
   {
     role: 'admin',
     label: 'Admin',
-    desc: 'Dashboard lengkap, grafik, dan laporan',
+    desc: 'Dashboard invoice, pembayaran & laporan',
     icon: ShieldCheck,
     color: '#10b981',
     gradient: 'linear-gradient(135deg, #10b981, #06b6d4)',
-    password: 'admin123',
+    password: '123',
   },
 ]
 
