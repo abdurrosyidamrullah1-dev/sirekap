@@ -43,9 +43,17 @@ function AnimatedRoutes() {
 }
 
 export default function App() {
+  const role = getRole()
+
   useEffect(() => {
     initGoogleAPI().catch(console.error)
-  }, [])
+    // Apply role-based theme to <html>
+    if (role) {
+      document.documentElement.setAttribute('data-role', role)
+    } else {
+      document.documentElement.removeAttribute('data-role')
+    }
+  }, [role])
 
   const loggedIn = isLoggedIn()
 

@@ -50,6 +50,7 @@ export default function Login() {
     await new Promise(r => setTimeout(r, 800))
     localStorage.setItem('sirekap_role', selected)
     localStorage.setItem('sirekap_logged_in', '1')
+    document.documentElement.setAttribute('data-role', selected)
     navigate(selected === 'admin' ? '/admin' : '/')
   }
 

@@ -195,27 +195,78 @@ export default function Sidebar() {
         animate={{ x: 0 }}
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
       >
-        {/* Logo */}
-        <div className="sidebar-logo">
-          <motion.div
-            className="sidebar-logo-icon"
-            whileHover={{ scale: 1.08, rotate: 5 }}
-            transition={{ type: 'spring', stiffness: 400 }}
-            style={{ padding: 0, overflow: 'hidden', background: 'transparent' }}
-          >
-            <img src="/logo.png" alt="Si Rekap" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          </motion.div>
-          <div className="sidebar-logo-text">
-            <span className="sidebar-logo-title">Si Rekap</span>
-            <span className="sidebar-logo-sub">Order Manager</span>
+        {/* ── Header / Logo ── */}
+        <div style={{
+          padding: '0 0 0 0',
+          background: role === 'admin'
+            ? 'linear-gradient(160deg, #071f18 0%, #041510 100%)'
+            : 'linear-gradient(160deg, #151f38 0%, #0d1527 100%)',
+          borderBottom: role === 'admin' ? '1px solid #134d37' : '1px solid #1e2d47',
+        }}>
+          {/* Role badge strip */}
+          <div style={{
+            padding: '6px 14px',
+            background: role === 'admin'
+              ? 'linear-gradient(90deg, #10b98120, transparent)'
+              : 'linear-gradient(90deg, #6366f120, transparent)',
+            borderBottom: role === 'admin' ? '1px solid #0d3d2a' : '1px solid #1a2847',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}>
+            <div style={{
+              width: 6, height: 6, borderRadius: '50%',
+              background: role === 'admin' ? '#10b981' : '#6366f1',
+              boxShadow: role === 'admin' ? '0 0 8px #10b981' : '0 0 8px #6366f1',
+            }} />
+            <span style={{
+              fontSize: 9, fontWeight: 800, letterSpacing: 2,
+              textTransform: 'uppercase',
+              color: role === 'admin' ? '#10b981' : '#818cf8',
+            }}>
+              {role === 'admin' ? 'ADMIN PANEL' : 'DESIGNER PANEL'}
+            </span>
+          </div>
+
+          {/* Logo row */}
+          <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <motion.div
+              whileHover={{ scale: 1.08, rotate: 5 }}
+              transition={{ type: 'spring', stiffness: 400 }}
+              style={{
+                width: 42, height: 42, borderRadius: 12, overflow: 'hidden',
+                flexShrink: 0,
+                boxShadow: role === 'admin'
+                  ? '0 0 16px rgba(16,185,129,0.35)'
+                  : '0 0 16px rgba(99,102,241,0.35)',
+                border: role === 'admin' ? '2px solid #10b98140' : '2px solid #6366f140',
+              }}
+            >
+              <img src="/logo.png" alt="Si Rekap" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            </motion.div>
+            <div>
+              <div style={{
+                fontWeight: 900, fontSize: 16, letterSpacing: -0.5,
+                color: '#fff', lineHeight: 1.2,
+              }}>Si Rekap</div>
+              <div style={{
+                fontSize: 10, fontWeight: 600, marginTop: 2,
+                color: role === 'admin' ? '#6ee7b7' : '#a5b4fc',
+                letterSpacing: 0.3,
+              }}>
+                {role === 'admin' ? 'Bhinneka Production' : 'Design Manager'}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Nav */}
-        <nav className="sidebar-nav">
-          <span className="nav-section-label">Menu</span>
+        {/* ── Nav ── */}
+        <nav className="sidebar-nav" style={{ padding: '12px 10px' }}>
+          <span style={{
+            display: 'block', fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
+            textTransform: 'uppercase', padding: '8px 6px 6px',
+            color: role === 'admin' ? '#2d6a4f' : '#2d4068',
+          }}>Menu Utama</span>
           {navItems.map((item, i) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'}>
+            <NavLink key={item.to} to={item.to} end={item.to === '/' || item.to === '/admin'}>
               {({ isActive }) => (
                 <motion.div
                   className={`nav-item ${isActive ? 'active' : ''}`}
@@ -224,20 +275,23 @@ export default function Sidebar() {
                   transition={{ delay: i * 0.06, type: 'spring', stiffness: 300 }}
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.97 }}
+                  style={{
+                    color: isActive
+                      ? (role === 'admin' ? '#10b981' : '#818cf8')
+                      : (role === 'admin' ? '#6ee7b7' : '#94a3b8'),
+                    background: isActive
+                      ? (role === 'admin' ? 'rgba(16,185,129,0.12)' : 'rgba(99,102,241,0.12)')
+                      : 'transparent',
+                    fontWeight: isActive ? 700 : 500,
+                    borderLeft: isActive
+                      ? `3px solid ${role === 'admin' ? '#10b981' : '#6366f1'}`
+                      : '3px solid transparent',
+                    paddingLeft: 10,
+                    borderRadius: 8,
+                    marginBottom: 2,
+                  }}
                 >
-                  <AnimatePresence>
-                    {isActive && (
-                      <motion.div
-                        className="nav-active-bar"
-                        layoutId="activeBar"
-                        initial={{ scaleY: 0 }}
-                        animate={{ scaleY: 1 }}
-                        exit={{ scaleY: 0 }}
-                        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-                      />
-                    )}
-                  </AnimatePresence>
-                  <item.icon className="nav-icon" size={18} />
+                  <item.icon size={17} style={{ flexShrink: 0 }} />
                   {item.label}
                 </motion.div>
               )}
@@ -245,7 +299,7 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        {/* Footer - Google Drive */}
+        {/* ── Footer ── */}
         <div className="sidebar-footer">
           {/* Install PWA */}
           {deferredPrompt && (
@@ -255,7 +309,7 @@ export default function Sidebar() {
                 width: '100%', textAlign: 'left', fontSize: 13, color: 'var(--text-primary)',
                 background: 'var(--accent)', border: 'none', cursor: 'pointer', padding: '10px 14px',
                 borderRadius: '8px', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12,
-                fontWeight: 600, boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                fontWeight: 600, boxShadow: 'var(--shadow-blue)'
               }}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
