@@ -28,7 +28,16 @@ export default function Orders() {
     setLoading(true)
     try {
       const data = await getOrders({ status, search, role: 'designer' })
-      setOrders(data)
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      
+      const filteredData = data.filter(order => {
+        if (order.status === 'done' || order.status === 'cancelled') {
+          return new Date(order.updated_at || order.created_at) >= sevenDaysAgo
+        }
+        return true
+      })
+      setOrders(filteredData)
     } catch (e) {
       toast.error('Gagal memuat orderan')
     } finally {
