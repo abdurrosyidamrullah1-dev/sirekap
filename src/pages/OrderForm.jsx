@@ -14,7 +14,6 @@ export default function OrderForm() {
 
   const [form, setForm] = useState({
     customer_name: '',
-    customer_phone: '',
     status: 'pending',
     deadline: '',
     notes: '',
@@ -157,15 +156,7 @@ export default function OrderForm() {
                     autoFocus
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">No. HP / WhatsApp</label>
-                  <input
-                    className="form-input"
-                    placeholder="Contoh: 08123456789"
-                    value={form.customer_phone}
-                    onChange={e => updateForm('customer_phone', e.target.value)}
-                  />
-                </div>
+
                 <div className="form-group">
                   <label className="form-label">Status Awal</label>
                   <select className="form-select" value={form.status} onChange={e => updateForm('status', e.target.value)}>
