@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   FolderOpen, Search, HardDrive, File, FileText,
-  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X, Plus, Upload, FolderUp, CheckSquare
+  Image, Video, Music, ExternalLink, Loader2, Grid, List, AlertCircle, Trash2, X, Plus, Upload, FolderUp, CheckSquare, RefreshCw
 } from 'lucide-react'
 import { getAllOrderFolders, getDriveFilesByFolder, isGoogleSignedIn, deleteDriveFile, createFolder, uploadFileToDrive } from '../lib/drive'
 import toast from 'react-hot-toast'
@@ -14,10 +14,12 @@ const FILE_ICONS = {
   audio: Music,
   pdf: FileText,
   text: FileText,
+  folder: FolderOpen,
   default: File,
 }
 
 const getFileCategory = (mimeType = '', name = '') => {
+  if (mimeType === 'application/vnd.google-apps.folder') return 'folder'
   if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(name)) return 'image'
   if (mimeType.startsWith('video/') || /\.(mp4|mov|avi|mkv)$/i.test(name)) return 'video'
   if (mimeType.startsWith('audio/') || /\.(mp3|wav|flac)$/i.test(name)) return 'audio'
@@ -58,6 +60,7 @@ export default function DriveManager() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [selectedFolder, setSelectedFolder] = useState(null)
+  const [currentRightFolder, setCurrentRightFolder] = useState(null) // Added for subfolder navigation
   
   const [files, setFiles] = useState([])
   const [loadingFiles, setLoadingFiles] = useState(false)
@@ -76,45 +79,17 @@ export default function DriveManager() {
   const [uploadProgress, setUploadProgress] = useState(null)
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, file: null })
 
+  const [dragOver, setDragOver] = useState(false)
+  const [uploadModal, setUploadModal] = useState({ isOpen: false, files: null })
+  const [uploadClientName, setUploadClientName] = useState('')
+
   const connected = isGoogleSignedIn()
 
-  useEffect(() => {
-    if (!connected) {
-      setLoading(false)
-      return
-    }
-    const loadFolders = async () => {
-      try {
-        const data = await getAllOrderFolders()
-        setFolders(data)
-      } catch (err) {
-        console.error('Failed to load folders:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    loadFolders()
-  }, [connected])
-
-  useEffect(() => {
-    const handleMouseUp = () => setDragSelecting(false)
-    const handleClick = () => setContextMenu(prev => prev.visible ? { ...prev, visible: false } : prev)
-    window.addEventListener('mouseup', handleMouseUp)
-    window.addEventListener('click', handleClick)
-    return () => {
-      window.removeEventListener('mouseup', handleMouseUp)
-      window.removeEventListener('click', handleClick)
-    }
-  }, [])
-
-  const handleSelectFolder = async (folder) => {
-    setSelectedFolder(folder)
-    setSelectedFile(null)
-    setSelectedFiles(new Set())
+  const loadRightFiles = async (folderId) => {
     setLoadingFiles(true)
     setFiles([])
     try {
-      const data = await getDriveFilesByFolder(folder.id)
+      const data = await getDriveFilesByFolder(folderId)
       setFiles(data)
     } catch (err) {
       console.error('Failed to load files:', err)
@@ -122,6 +97,70 @@ export default function DriveManager() {
       setLoadingFiles(false)
     }
   }
+
+  const handleRefresh = async () => {
+    if (!connected) return
+    setLoading(true)
+    try {
+      const data = await getAllOrderFolders()
+      setFolders(data)
+      if (currentRightFolder) {
+        await loadRightFiles(currentRightFolder.id)
+      }
+    } catch (err) {
+      console.error('Failed to refresh:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!connected) {
+      setLoading(false)
+      return
+    }
+    handleRefresh()
+  }, [connected])
+
+  useEffect(() => {
+    const handleMouseUp = () => setDragSelecting(false)
+    const handleClick = () => setContextMenu(prev => prev.visible ? { ...prev, visible: false } : prev)
+    
+    const handleDragOver = (e) => { e.preventDefault(); setDragOver(true) }
+    const handleDragLeave = (e) => {
+      if (e.clientX === 0 || e.clientY === 0) setDragOver(false)
+    }
+    const handleDrop = (e) => {
+      e.preventDefault()
+      setDragOver(false)
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        setUploadModal({ isOpen: true, files: e.dataTransfer.files })
+      }
+    }
+
+    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('click', handleClick)
+    window.addEventListener('dragover', handleDragOver)
+    window.addEventListener('dragleave', handleDragLeave)
+    window.addEventListener('drop', handleDrop)
+    
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('click', handleClick)
+      window.removeEventListener('dragover', handleDragOver)
+      window.removeEventListener('dragleave', handleDragLeave)
+      window.removeEventListener('drop', handleDrop)
+    }
+  }, [])
+
+  const handleSelectFolder = async (folder) => {
+    setSelectedFolder(folder)
+    setCurrentRightFolder(folder)
+    setSelectedFile(null)
+    setSelectedFiles(new Set())
+    loadRightFiles(folder.id)
+  }
+
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) return
@@ -140,7 +179,7 @@ export default function DriveManager() {
 
   const handleUploadFile = async (e) => {
     const filesToUpload = e.target.files
-    if (!filesToUpload || filesToUpload.length === 0 || !selectedFolder) return
+    if (!filesToUpload || filesToUpload.length === 0 || !currentRightFolder) return
     
     setUploadingFile(true)
     try {
@@ -148,7 +187,7 @@ export default function DriveManager() {
       for (let i = 0; i < filesToUpload.length; i++) {
         const file = filesToUpload[i]
         setUploadProgress({ name: file.name, current: i + 1, total: filesToUpload.length, percent: 0 })
-        const uploaded = await uploadFileToDrive(file, selectedFolder.id, (percent) => {
+        const uploaded = await uploadFileToDrive(file, currentRightFolder.id, (percent) => {
           setUploadProgress(prev => prev ? { ...prev, percent } : null)
         })
         newFiles.push(uploaded)
@@ -273,11 +312,20 @@ export default function DriveManager() {
       exit={{ opacity: 0 }}
       style={{ display: 'flex', flexDirection: 'column', height: '100%' }}
     >
-      <div className="page-header" style={{ flexShrink: 0 }}>
+      <div className="page-header" style={{ flexShrink: 0, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="page-header-left">
           <h1>Drive Manager ☁️</h1>
           <p>Kelola semua file desain langsung dari Google Drive</p>
         </div>
+        <button 
+          onClick={handleRefresh} 
+          disabled={loading || loadingFiles}
+          className="btn btn-secondary"
+          style={{ height: 40 }}
+        >
+          <RefreshCw size={16} className={loading || loadingFiles ? "spin" : ""} />
+          Refresh
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 20, flex: 1, minHeight: 0 }}>
@@ -396,13 +444,25 @@ export default function DriveManager() {
               {/* Header */}
               <div className="card-header" style={{ padding: '16px 24px', borderBottom: '1px solid var(--border)', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  {currentRightFolder?.id !== selectedFolder?.id && (
+                    <button 
+                      onClick={() => {
+                        setCurrentRightFolder(selectedFolder)
+                        loadRightFiles(selectedFolder.id)
+                      }}
+                      className="btn btn-secondary btn-sm"
+                      style={{ padding: '6px 10px', marginRight: 4 }}
+                    >
+                      ← Kembali
+                    </button>
+                  )}
                   <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--accent-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <FolderOpen size={20} style={{ color: 'var(--accent)' }} />
                   </div>
                   <div>
-                    <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{selectedFolder.name}</h2>
+                    <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>{currentRightFolder?.name || selectedFolder.name}</h2>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                      {files.length} file ditemukan
+                      {files.length} item ditemukan
                     </div>
                   </div>
                 </div>
@@ -445,11 +505,11 @@ export default function DriveManager() {
                       </button>
                     ))}
                   </div>
-                  <a href={selectedFolder.webViewLink} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+                  <a href={currentRightFolder?.webViewLink || selectedFolder.webViewLink} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
                     <ExternalLink size={14} /> Buka Drive
                   </a>
                   <button 
-                    onClick={() => handleDeleteFolder(selectedFolder)}
+                    onClick={() => handleDeleteFolder(currentRightFolder || selectedFolder)}
                     className="btn btn-sm"
                     style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', padding: '6px 10px' }}
                     title="Hapus Folder"
@@ -508,7 +568,15 @@ export default function DriveManager() {
                             transition={{ delay: i * 0.03 }}
                             onMouseDown={(e) => {
                               if (e.target.closest('button') || e.target.closest('a')) return
-                              if (e.detail === 2) { setSelectedFile(file); return }
+                              if (e.detail === 2) { 
+                                if (cat === 'folder') {
+                                  setCurrentRightFolder(file)
+                                  loadRightFiles(file.id)
+                                } else {
+                                  setSelectedFile(file)
+                                }
+                                return 
+                              }
                               setDragSelecting(true)
                               setSelectedFiles(prev => {
                                 const next = new Set(prev)
@@ -591,7 +659,15 @@ export default function DriveManager() {
                             transition={{ delay: i * 0.02 }}
                             onMouseDown={(e) => {
                               if (e.target.closest('button') || e.target.closest('a')) return
-                              if (e.detail === 2) { setSelectedFile(file); return }
+                              if (e.detail === 2) { 
+                                if (cat === 'folder') {
+                                  setCurrentRightFolder(file)
+                                  loadRightFiles(file.id)
+                                } else {
+                                  setSelectedFile(file)
+                                }
+                                return 
+                              }
                               setDragSelecting(true)
                               setSelectedFiles(prev => {
                                 const next = new Set(prev)
@@ -735,6 +811,104 @@ export default function DriveManager() {
           )}
         </AnimatePresence>
       </div>
+
+      <AnimatePresence>
+        {dragOver && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(37, 99, 235, 0.9)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white' }}
+          >
+            <Upload size={80} style={{ marginBottom: 20 }} />
+            <h2 style={{ fontSize: 32, fontWeight: 800 }}>Lepaskan untuk Mengupload</h2>
+            <p style={{ fontSize: 18, opacity: 0.8 }}>File akan dikelompokkan ke dalam folder klien baru</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {uploadModal.isOpen && (
+          <motion.div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 10000,
+              background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          >
+            <motion.div
+              style={{ background: 'var(--bg-card)', padding: 30, borderRadius: 16, width: 400, maxWidth: '90%', boxShadow: 'var(--shadow-xl)' }}
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+            >
+              <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <FolderOpen size={20} color="var(--accent)" />
+                Buat Orderan Baru
+              </h3>
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 20 }}>
+                {uploadModal.files?.length} file akan diupload. Masukkan nama klien untuk mengelompokkan file.
+              </p>
+              
+              <input 
+                autoFocus
+                className="form-input" 
+                placeholder="Misal: Brin, Kemenkeu, Budi..." 
+                value={uploadClientName}
+                onChange={e => setUploadClientName(e.target.value)}
+                style={{ width: '100%', marginBottom: 20 }}
+              />
+
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button 
+                  className="btn btn-secondary" 
+                  onClick={() => { setUploadModal({ isOpen: false, files: null }); setUploadClientName('') }}
+                  disabled={uploadingFile}
+                >
+                  Batal
+                </button>
+                <button 
+                  className="btn btn-primary" 
+                  disabled={!uploadClientName.trim() || uploadingFile}
+                  onClick={async () => {
+                    setUploadingFile(true)
+                    try {
+                      const { createOrderFolder } = await import('../lib/drive')
+                      // This creates ClientName -> DateFolder
+                      const { id: folderId, customerFolderId } = await createOrderFolder(uploadClientName, null)
+                      
+                      let newFiles = []
+                      for (let i = 0; i < uploadModal.files.length; i++) {
+                        const file = uploadModal.files[i]
+                        setUploadProgress({ name: file.name, current: i + 1, total: uploadModal.files.length, percent: 0 })
+                        const uploaded = await uploadFileToDrive(file, folderId, (percent) => {
+                          setUploadProgress(prev => prev ? { ...prev, percent } : null)
+                        })
+                        newFiles.push(uploaded)
+                      }
+                      
+                      toast.success(`${uploadModal.files.length} file berhasil diupload ke ${uploadClientName}`)
+                      setUploadModal({ isOpen: false, files: null })
+                      setUploadClientName('')
+                      
+                      // Refresh folders list
+                      const newFolders = await getAllOrderFolders()
+                      setFolders(newFolders)
+                      
+                    } catch (err) {
+                      toast.error('Gagal upload: ' + err.message)
+                      console.error(err)
+                    } finally {
+                      setUploadingFile(false)
+                      setUploadProgress(null)
+                    }
+                  }}
+                >
+                  {uploadingFile ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
+                  Upload Sekarang
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {contextMenu.visible && contextMenu.file && (
