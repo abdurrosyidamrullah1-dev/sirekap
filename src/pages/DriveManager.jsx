@@ -130,11 +130,35 @@ export default function DriveManager() {
     const handleDragLeave = (e) => {
       if (e.clientX === 0 || e.clientY === 0) setDragOver(false)
     }
-    const handleDrop = (e) => {
+    const handleDrop = async (e) => {
       e.preventDefault()
       setDragOver(false)
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        setUploadModal({ isOpen: true, files: e.dataTransfer.files })
+      const droppedFiles = e.dataTransfer.files
+      if (droppedFiles && droppedFiles.length > 0) {
+        if (currentRightFolder) {
+          setUploadingFile(true)
+          try {
+            let newFiles = []
+            for (let i = 0; i < droppedFiles.length; i++) {
+              const file = droppedFiles[i]
+              setUploadProgress({ name: file.name, current: i + 1, total: droppedFiles.length, percent: 0 })
+              const uploaded = await uploadFileToDrive(file, currentRightFolder.id, (percent) => {
+                setUploadProgress(prev => prev ? { ...prev, percent } : null)
+              })
+              newFiles.push(uploaded)
+            }
+            setFiles(prev => [...newFiles, ...prev])
+            toast.success(`${droppedFiles.length} file diupload ke ${currentRightFolder.name}`)
+          } catch (err) {
+            toast.error('Gagal upload file')
+            console.error(err)
+          } finally {
+            setUploadingFile(false)
+            setUploadProgress(null)
+          }
+        } else {
+          setUploadModal({ isOpen: true, files: droppedFiles })
+        }
       }
     }
 
@@ -151,7 +175,7 @@ export default function DriveManager() {
       window.removeEventListener('dragleave', handleDragLeave)
       window.removeEventListener('drop', handleDrop)
     }
-  }, [])
+  }, [currentRightFolder])
 
   const handleSelectFolder = async (folder) => {
     setSelectedFolder(folder)
