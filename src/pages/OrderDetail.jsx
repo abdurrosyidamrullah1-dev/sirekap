@@ -13,52 +13,9 @@ import {
 } from '../lib/supabase'
 import FileManager from '../components/FileManager'
 import WorkflowTracker from '../components/WorkflowTracker'
-import InvoiceTemplate from '../components/InvoiceTemplate'
+
 import { isGoogleSignedIn, getAccessToken } from '../lib/drive'
 import toast from 'react-hot-toast'
-
-// ─── Upload invoice PDF ke Drive (folder perbulan) ────────────────────────────
-async function uploadInvoiceToDrive(pdfBlob, customerName, invoiceDate) {
-  const token = getAccessToken()
-  if (!token) return null
-
-  const monthFolder = new Date(invoiceDate).toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
-  const rootName = 'Invoice Bhinneka Production'
-
-  const search = async (q) => {
-    const url = new URL('https://www.googleapis.com/drive/v3/files')
-    url.searchParams.set('q', q); url.searchParams.set('fields', 'files(id,name)'); url.searchParams.set('spaces', 'drive')
-    const r = await fetch(url.toString(), { headers: { Authorization: `Bearer ${token}` } })
-    if (!r.ok) return []
-    return (await r.json()).files || []
-  }
-  const mkDir = async (name, parentId) => {
-    const body = { name, mimeType: 'application/vnd.google-apps.folder' }
-    if (parentId) body.parents = [parentId]
-    const r = await fetch('https://www.googleapis.com/drive/v3/files?fields=id', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    return (await r.json()).id
-  }
-
-  const roots = await search(`name='${rootName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`)
-  const rootId = roots.length > 0 ? roots[0].id : await mkDir(rootName, null)
-
-  const months = await search(`'${rootId}' in parents and name='${monthFolder}' and mimeType='application/vnd.google-apps.folder' and trashed=false`)
-  const monthId = months.length > 0 ? months[0].id : await mkDir(monthFolder, rootId)
-
-  const fileName = `Invoice_${customerName}_${new Date(invoiceDate).toLocaleDateString('id-ID').replace(/\//g, '-')}.pdf`
-  const form = new FormData()
-  form.append('metadata', new Blob([JSON.stringify({ name: fileName, parents: [monthId] })], { type: 'application/json' }))
-  form.append('file', pdfBlob, fileName)
-
-  const res = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink,name', {
-    method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form,
-  })
-  return res.ok ? await res.json() : null
-}
 
 const ITEM_STATUS = [
   { value: 'pending',     label: 'Pending',  icon: Clock,         color: 'var(--warning)' },
@@ -68,7 +25,6 @@ const ITEM_STATUS = [
 
 const TABS = [
   { key: 'info',     label: 'Info & Item',   icon: Info },
-  { key: 'invoice',  label: 'Invoice',        icon: Receipt },
   { key: 'files',    label: 'File Manager',  icon: FolderOpen },
   { key: 'workflow', label: 'Workflow',      icon: Workflow },
 ]
@@ -185,78 +141,7 @@ export default function OrderDetail() {
     }
   }
 
-  const handleSendWA = () => {
-    const phone = order.customer_phone?.replace(/[^0-9]/g, '') || ''
-    const items = order.order_items || []
-    const total = items.reduce((s, it) => s + ((it.unit_price || 0) * (it.quantity || 1)), 0)
-    const itemList = items.map((it, i) =>
-      `${i + 1}. ${it.item_name} (${it.quantity}x) — Rp ${(((it.unit_price || 0) * (it.quantity || 1))).toLocaleString('id-ID')}`
-    ).join('\n')
 
-    const msg = [
-      `Halo ${order.customer_name}, berikut detail invoice pesanan Anda di Bhinneka Production:`,
-      ``,
-      `📋 *INVOICE*`,
-      `Tanggal: ${new Date(order.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}`,
-      ``,
-      `*Daftar Pesanan:*`,
-      itemList,
-      ``,
-      total > 0 ? `*Total: Rp ${total.toLocaleString('id-ID')}*` : '',
-      ``,
-      `Pembayaran via Transfer BCA: *5490327187* a/n Saputra Malik`,
-      ``,
-      `Terima kasih sudah mempercayai Bhinneka Production! 🙏`,
-    ].filter(Boolean).join('\n')
-
-    const waUrl = phone
-      ? `https://wa.me/62${phone.replace(/^0/, '')}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`
-    window.open(waUrl, '_blank')
-  }
-
-  const handleDownloadInvoice = async () => {
-    const el = document.getElementById('invoice-print-area')
-    if (!el) { toast.error('Invoice tidak ditemukan'); return }
-    try {
-      toast.loading('Membuat PDF...')
-      const { default: html2canvas } = await import('html2canvas-pro')
-      const { jsPDF } = await import('jspdf')
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#fff' })
-      const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const pageWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      const imgProps = pdf.getImageProperties(imgData)
-      const imgHeight = (imgProps.height * pageWidth) / imgProps.width
-      pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, Math.min(imgHeight, pageHeight))
-      // Download ke browser
-      pdf.save(`Invoice_${order.customer_name}_${new Date().toLocaleDateString('id-ID').replace(/\//g, '-')}.pdf`)
-      toast.dismiss()
-      toast.success('Invoice berhasil didownload!')
-
-      // Auto-upload ke Google Drive (folder perbulan) kalau sudah login
-      if (isGoogleSignedIn()) {
-        toast.loading('Mengupload ke Google Drive...', { id: 'drive-upload' })
-        try {
-          const pdfBlob = pdf.output('blob')
-          const result = await uploadInvoiceToDrive(pdfBlob, order.customer_name, order.created_at)
-          toast.dismiss('drive-upload')
-          if (result) toast.success(`Invoice tersimpan ke Drive! 📁`, { duration: 4000 })
-        } catch {
-          toast.dismiss('drive-upload')
-        }
-      }
-    } catch (e) {
-      toast.dismiss()
-      toast.error('Gagal download invoice')
-      console.error(e)
-    }
-  }
-
-  const handlePrintInvoice = () => {
-    window.print()
-  }
 
   const formatDate = (d) => {
     if (!d) return '-'
@@ -659,69 +544,7 @@ export default function OrderDetail() {
         )}
 
 
-        {/* ── INVOICE TAB ── */}
-        {tab === 'invoice' && (
-          <motion.div
-            key="invoice"
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-          >
-            {/* Action bar */}
-            <div className="no-print card" style={{ marginBottom: 16 }}>
-              <div className="card-body" style={{ padding: '14px 20px' }}>
-                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <div style={{ flex: 1, fontSize: 13, color: 'var(--text-muted)' }}>
-                    <Receipt size={14} style={{ display: 'inline', marginRight: 6, color: 'var(--accent)' }} />
-                    Preview invoice siap. Pilih aksi:
-                  </div>
-                  <motion.button
-                    className="btn"
-                    style={{ background: '#25d366', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: 7 }}
-                    onClick={handleSendWA}
-                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  >
-                    <MessageCircle size={16} /> Kirim WA
-                  </motion.button>
-                  <motion.button
-                    className="btn btn-primary"
-                    style={{ display: 'flex', alignItems: 'center', gap: 7 }}
-                    onClick={handleDownloadInvoice}
-                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  >
-                    <Download size={16} /> Download PDF
-                  </motion.button>
-                  <motion.button
-                    className="btn btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: 7 }}
-                    onClick={handlePrintInvoice}
-                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  >
-                    <Printer size={16} /> Print
-                  </motion.button>
-                  <motion.button
-                    className="btn"
-                    style={{ background: '#ef4444', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: 7 }}
-                    onClick={handleDeleteOrder}
-                    disabled={deletingOrder}
-                    whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}
-                  >
-                    <Trash2 size={16} /> Hapus
-                  </motion.button>
-                </div>
-                <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 8, fontSize: 12, color: 'var(--text-muted)' }}>
-                  💡 <strong>Kirim WA:</strong> Akan membuka WhatsApp dengan teks tagihan yang sudah terisi. Kamu bisa lampirkan PDF yang sudah didownload secara manual.
-                </div>
-              </div>
-            </div>
 
-            {/* Invoice Preview */}
-            <div style={{ overflowX: 'auto', background: 'var(--bg-tertiary)', borderRadius: 16, padding: 24 }}>
-              <div style={{ boxShadow: '0 8px 40px rgba(0,0,0,0.3)', borderRadius: 8, display: 'inline-block', minWidth: '794px' }}>
-                <InvoiceTemplate ref={invoiceRef} order={order} />
-              </div>
-            </div>
-          </motion.div>
-        )}
 
         {/* ── FILES TAB ── */}
         {tab === 'files' && (
