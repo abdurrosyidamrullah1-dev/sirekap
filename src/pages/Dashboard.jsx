@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, TrendingUp, Package, Clock, CheckCircle2, PlusCircle, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getOrders, getOrderStats, supabase } from '../lib/supabase'
+import { getOrders, getOrderStats, supabase, getStatusConfig } from '../lib/supabase'
 import StatCard from '../components/StatCard'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -70,12 +70,6 @@ export default function Dashboard() {
 
   const formatDate = (d) => new Date(d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
 
-  const statusConfig = {
-    pending:     { label: 'Pending',    color: 'var(--warning)' },
-    in_progress: { label: 'Dikerjakan', color: 'var(--blue-500)' },
-    done:        { label: 'Selesai',    color: 'var(--success)' },
-    cancelled:   { label: 'Batal',      color: 'var(--danger)' },
-  }
 
   if (loading) return (
     <div className="page-container">
@@ -201,7 +195,7 @@ export default function Dashboard() {
                   <p>Belum ada orderan</p>
                 </div>
               ) : recentOrders.map((order, i) => {
-                const cfg = statusConfig[order.status] || statusConfig.pending
+                const cfg = getStatusConfig(order.status)
                 return (
                   <motion.div
                     key={order.id}
