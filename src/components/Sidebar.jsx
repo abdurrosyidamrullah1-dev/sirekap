@@ -107,6 +107,7 @@ export default function Sidebar() {
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   })
+  const [hoveredNav, setHoveredNav] = useState(null)
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark'
@@ -259,29 +260,43 @@ export default function Sidebar() {
           }}>Menu Utama</span>
           {DESIGNER_NAV.map((item, i) => (
             <NavLink key={item.to} to={item.to} end={item.to === '/'} style={{ textDecoration: 'none' }}>
-              {({ isActive }) => (
-                <motion.div
-                  className={`nav-item ${isActive ? 'active' : ''}`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.06, type: 'spring', stiffness: 300 }}
-                  whileHover={!isActive ? { x: 4, backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : { x: 0 }}
-                  whileTap={{ scale: 0.97 }}
-                  style={{
-                    color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
-                    background: isActive ? 'var(--accent-light)' : 'transparent',
-                    fontWeight: isActive ? 700 : 500,
-                    borderLeft: isActive ? `3px solid var(--accent)` : '3px solid transparent',
-                    paddingLeft: 10,
-                    borderRadius: 8,
-                    marginBottom: 2,
-                    transition: 'color 0.15s, background 0.15s',
-                  }}
-                >
-                  <item.icon size={17} style={{ flexShrink: 0 }} />
-                  {item.label}
-                </motion.div>
-              )}
+              {({ isActive }) => {
+                const isHovered = hoveredNav === item.to && !isActive
+                return (
+                  <motion.div
+                    className={`nav-item ${isActive ? 'active' : ''}`}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.06, type: 'spring', stiffness: 300 }}
+                    whileTap={{ scale: 0.97 }}
+                    onHoverStart={() => setHoveredNav(item.to)}
+                    onHoverEnd={() => setHoveredNav(null)}
+                    style={{
+                      color: isActive ? '#fff' : isHovered ? '#fff' : 'var(--text-secondary)',
+                      background: isActive
+                        ? 'linear-gradient(135deg, var(--blue-600), var(--blue-700))'
+                        : isHovered
+                        ? 'linear-gradient(135deg, rgba(99,102,241,0.85), rgba(59,130,246,0.85))'
+                        : 'transparent',
+                      fontWeight: isActive || isHovered ? 700 : 500,
+                      borderLeft: isActive
+                        ? '3px solid #fff'
+                        : isHovered
+                        ? '3px solid rgba(255,255,255,0.6)'
+                        : '3px solid transparent',
+                      paddingLeft: 10,
+                      borderRadius: 8,
+                      marginBottom: 2,
+                      boxShadow: isHovered && !isActive ? '0 4px 14px rgba(99,102,241,0.35)' : 'none',
+                      transform: isHovered && !isActive ? 'translateX(4px)' : 'translateX(0)',
+                      transition: 'all 0.18s cubic-bezier(0.4,0,0.2,1)',
+                    }}
+                  >
+                    <item.icon size={17} style={{ flexShrink: 0 }} />
+                    {item.label}
+                  </motion.div>
+                )
+              }}
             </NavLink>
           ))}
         </nav>
