@@ -313,19 +313,7 @@ export default function FileManager({ order, onFilesChanged }) {
               return (
                 <motion.div key={file.id}
                   initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ delay: i * 0.04 }}
-                  onMouseDown={(e) => {
-                    if (e.target.closest('button') || e.target.closest('a')) return
-                    setDragSelecting(true)
-                    setSelectedFiles(prev => {
-                      const next = new Set(prev)
-                      if (next.has(file.id)) next.delete(file.id)
-                      else next.add(file.id)
-                      return next
-                    })
-                  }}
-                  onMouseEnter={() => {
-                    if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
-                  }}
+                  onClick={() => setPreview(file)}
                   onContextMenu={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -338,18 +326,32 @@ export default function FileManager({ order, onFilesChanged }) {
                   }}
                   whileHover={{ y: -3, boxShadow: 'var(--shadow-md)', borderColor: isSelected ? 'var(--accent)' : 'var(--blue-200)' }}
                 >
-                  {isSelected && (
-                    <div style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, color: 'var(--accent)', background: 'white', borderRadius: 4, display: 'flex' }}>
-                      <CheckSquare size={16} />
-                    </div>
-                  )}
-                  <div onClick={(e) => { if (e.detail === 2) setPreview(file) }} style={{ height: 90, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
-                    {cat === 'image' && file.drive_file_id ? (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedFiles(prev => {
+                        const next = new Set(prev)
+                        if (next.has(file.id)) next.delete(file.id)
+                        else next.add(file.id)
+                        return next
+                      })
+                    }}
+                    style={{
+                      position: 'absolute', top: 8, left: 8, zIndex: 10,
+                      color: isSelected ? 'white' : 'transparent',
+                      background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+                      border: isSelected ? 'none' : '1px solid var(--border)',
+                      borderRadius: 4, display: 'flex', padding: 2,
+                      boxShadow: isSelected ? '0 2px 8px rgba(37,99,235,0.4)' : 'none',
+                    }}
+                    className="file-grid-select"
+                  >
+                    <CheckSquare size={14} />
+                  </div>
+                  <div style={{ height: 90, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                    {(cat === 'image' || cat === 'pdf') && file.drive_file_id ? (
                       <img src={`https://drive.google.com/thumbnail?id=${file.drive_file_id}&sz=w200`} alt={file.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} draggable="false" />
                     ) : <Icon size={36} style={{ color: 'var(--accent)', opacity: 0.7 }} />}
-                    <div style={{ position: 'absolute', inset: 0, background: 'rgba(37,99,235,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.2s' }} className="file-grid-overlay" onClick={() => setPreview(file)}>
-                      <Eye size={20} style={{ color: 'white' }} />
-                    </div>
                   </div>
                   <div style={{ padding: '8px 10px' }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
@@ -380,19 +382,7 @@ export default function FileManager({ order, onFilesChanged }) {
               return (
                 <motion.div key={file.id} className="file-item"
                   initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ delay: i * 0.04 }}
-                  onMouseDown={(e) => {
-                    if (e.target.closest('button') || e.target.closest('a')) return
-                    setDragSelecting(true)
-                    setSelectedFiles(prev => {
-                      const next = new Set(prev)
-                      if (next.has(file.id)) next.delete(file.id)
-                      else next.add(file.id)
-                      return next
-                    })
-                  }}
-                  onMouseEnter={() => {
-                    if (dragSelecting) setSelectedFiles(prev => new Set([...prev, file.id]))
-                  }}
+                  onClick={() => setPreview(file)}
                   onContextMenu={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -401,19 +391,36 @@ export default function FileManager({ order, onFilesChanged }) {
                   style={{
                     background: isSelected ? 'var(--accent-light)' : 'var(--bg-card)',
                     border: `1px solid ${isSelected ? 'var(--accent)' : 'transparent'}`,
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
+                    borderRadius: 8
                   }}
                 >
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedFiles(prev => {
+                        const next = new Set(prev)
+                        if (next.has(file.id)) next.delete(file.id)
+                        else next.add(file.id)
+                        return next
+                      })
+                    }}
+                    style={{
+                      color: isSelected ? 'white' : 'transparent',
+                      background: isSelected ? 'var(--accent)' : 'var(--bg-secondary)',
+                      border: isSelected ? 'none' : '1px solid var(--border)',
+                      borderRadius: 4, display: 'flex', padding: 2,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <CheckSquare size={14} />
+                  </div>
                   <div className="file-icon" style={{ position: 'relative' }}>
-                    {isSelected && (
-                      <div style={{ position: 'absolute', inset: -2, zIndex: 10, color: 'var(--accent)', background: 'var(--bg-card)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <CheckSquare size={16} />
-                      </div>
-                    )}
-                    {cat === 'image' && file.drive_file_id ? <img src={`https://drive.google.com/thumbnail?id=${file.drive_file_id}&sz=w64`} alt="" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} draggable="false" /> : <Icon size={16} />}
+                    {(cat === 'image' || cat === 'pdf') && file.drive_file_id ? <img src={`https://drive.google.com/thumbnail?id=${file.drive_file_id}&sz=w64`} alt="" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} draggable="false" /> : <Icon size={20} />}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="file-name" style={{ color: isSelected ? 'var(--accent)' : 'var(--text-primary)' }}>{file.file_name}</div>
+                    <div className="file-name" style={{ color: isSelected ? 'var(--accent)' : 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{file.file_name}</div>
                     <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatBytes(file.file_size)} · {new Date(file.uploaded_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                   </div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
