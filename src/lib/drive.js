@@ -171,33 +171,13 @@ export const createOrderFolder = async (customerName, orderId) => {
   const token = getAccessToken()
   const rootId = await getOrCreateRootFolder()
   
-  const safeName = customerName.replace(/'/g, "\\'")
-  
-  const searchRes = await driveApi('files', 'GET', null, {
-    q: `'${rootId}' in parents and name='${safeName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-    fields: 'files(id,name)',
-    spaces: 'drive',
-  }, token)
-
-  let customerFolderId;
-  if (searchRes.files && searchRes.files.length > 0) {
-    customerFolderId = searchRes.files[0].id;
-  } else {
-    const customerFolder = await driveApi('files', 'POST', {
-      name: customerName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [rootId],
-    }, { fields: 'id' }, token)
-    customerFolderId = customerFolder.id;
-  }
-
-  const dateStr = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })
-  const name = dateStr
-
+  // Sesuai request: buat folder dengan nama customer langsung di root
+  // File akan ngumpul di dalam folder ini tanpa sub-folder.
+  // Jika customer order lagi, akan dibuatkan folder baru dengan nama yang sama.
   const folder = await driveApi('files', 'POST', {
-    name,
+    name: customerName,
     mimeType: 'application/vnd.google-apps.folder',
-    parents: [customerFolderId],
+    parents: [rootId],
   }, { fields: 'id,webViewLink,name' }, token)
 
   return { id: folder.id, url: folder.webViewLink, name: folder.name }
