@@ -262,33 +262,40 @@ export default function Sidebar() {
             <NavLink key={item.to} to={item.to} end={item.to === '/'} style={{ textDecoration: 'none' }}>
               {({ isActive }) => {
                 const isHovered = hoveredNav === item.to && !isActive
+                const isDark = theme === 'dark'
+
+                // Warna hover berbeda antara light dan dark mode
+                const hoverBg = isDark
+                  ? 'linear-gradient(135deg, #6366f1, #3b82f6)'
+                  : 'linear-gradient(135deg, #2563eb, #4f46e5)'
+                const hoverText = '#ffffff'
+
+                const activeBg = isDark
+                  ? 'linear-gradient(135deg, #2563eb, #1d4ed8)'
+                  : 'linear-gradient(135deg, #1d4ed8, #1e40af)'
+
                 return (
                   <motion.div
                     className={`nav-item ${isActive ? 'active' : ''}`}
                     initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
+                    animate={{ opacity: 1, x: isHovered ? 4 : 0 }}
                     transition={{ delay: i * 0.06, type: 'spring', stiffness: 300 }}
                     whileTap={{ scale: 0.97 }}
                     onHoverStart={() => setHoveredNav(item.to)}
                     onHoverEnd={() => setHoveredNav(null)}
                     style={{
-                      color: isActive ? '#fff' : isHovered ? '#fff' : 'var(--text-secondary)',
-                      background: isActive
-                        ? 'linear-gradient(135deg, var(--blue-600), var(--blue-700))'
-                        : isHovered
-                        ? 'linear-gradient(135deg, rgba(99,102,241,0.85), rgba(59,130,246,0.85))'
-                        : 'transparent',
+                      color: isActive ? '#fff' : isHovered ? hoverText : 'var(--text-secondary)',
+                      background: isActive ? activeBg : isHovered ? hoverBg : 'transparent',
                       fontWeight: isActive || isHovered ? 700 : 500,
                       borderLeft: isActive
-                        ? '3px solid #fff'
+                        ? '3px solid rgba(255,255,255,0.7)'
                         : isHovered
-                        ? '3px solid rgba(255,255,255,0.6)'
+                        ? '3px solid rgba(255,255,255,0.5)'
                         : '3px solid transparent',
                       paddingLeft: 10,
                       borderRadius: 8,
                       marginBottom: 2,
-                      boxShadow: isHovered && !isActive ? '0 4px 14px rgba(99,102,241,0.35)' : 'none',
-                      transform: isHovered && !isActive ? 'translateX(4px)' : 'translateX(0)',
+                      boxShadow: isHovered ? '0 4px 16px rgba(37,99,235,0.4)' : 'none',
                       transition: 'all 0.18s cubic-bezier(0.4,0,0.2,1)',
                     }}
                   >
@@ -300,6 +307,7 @@ export default function Sidebar() {
             </NavLink>
           ))}
         </nav>
+
 
         {/* ── Footer ── */}
         <div className="sidebar-footer">
