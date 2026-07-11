@@ -1,4 +1,4 @@
-﻿// Notifications: cek deadline orderan dan tampilkan reminder
+// Notifications: cek deadline orderan dan tampilkan reminder
 import { getOrders } from './supabase'
 
 export const requestNotificationPermission = async () => {
@@ -33,9 +33,9 @@ export const checkDeadlineNotifications = async () => {
       else if (deadlineDay.getTime() === tomorrow.getTime()) tomorrowCount++
     })
 
-    if (overdueCount > 0) showNotification('⚠️ Deadline Terlewat!', Ada  orderan yang sudah melewati deadline!)
-    else if (todayCount > 0) showNotification('🔥 Deadline Hari Ini!', Ada  orderan yang harus selesai hari ini!)
-    else if (tomorrowCount > 0) showNotification('⏰ Reminder Deadline', Ada  orderan yang deadline-nya besok!)
+    if (overdueCount > 0) showNotification('⚠️ Deadline Terlewat!', `Ada ${overdueCount} orderan yang sudah melewati deadline!`)
+    else if (todayCount > 0) showNotification('🔥 Deadline Hari Ini!', `Ada ${todayCount} orderan yang harus selesai hari ini!`)
+    else if (tomorrowCount > 0) showNotification('⏰ Reminder Deadline', `Ada ${tomorrowCount} orderan yang deadline-nya besok!`)
 
     return { overdueCount, todayCount, tomorrowCount, total: overdueCount + todayCount + tomorrowCount }
   } catch (e) {
