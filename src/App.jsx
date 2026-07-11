@@ -34,6 +34,13 @@ export default function App() {
   useEffect(() => {
     initGoogleAPI().catch(console.error)
     document.documentElement.setAttribute('data-role', 'designer')
+    
+    const savedTheme = localStorage.getItem('theme')
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme)
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.documentElement.setAttribute('data-theme', 'dark')
+    }
   }, [])
 
   return (

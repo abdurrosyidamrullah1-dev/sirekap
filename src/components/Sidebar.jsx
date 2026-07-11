@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, HardDrive, AlertCircle, X, FolderOpen } from 'lucide-react'
 import { isGoogleSignedIn, signInToGoogle, signOutGoogle, initGoogleAPI } from '../lib/drive'
 import { useState, useEffect } from 'react'
-import { MonitorDown } from 'lucide-react'
+import { MonitorDown, Moon, Sun } from 'lucide-react'
 
 const DESIGNER_NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -103,6 +103,17 @@ export default function Sidebar() {
   const [driveLoading, setDriveLoading] = useState(true)
   const [showSetup, setShowSetup] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState(null)
+  
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+  })
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark'
+    setTheme(newTheme)
+    document.documentElement.setAttribute('data-theme', newTheme)
+    localStorage.setItem('theme', newTheme)
+  }
 
   useEffect(() => {
     window.addEventListener('beforeinstallprompt', (e) => {
@@ -278,6 +289,24 @@ export default function Sidebar() {
 
         {/* ── Footer ── */}
         <div className="sidebar-footer">
+          {/* Theme Toggle */}
+          <motion.button
+            onClick={toggleTheme}
+            style={{
+              width: '100%', textAlign: 'left', fontSize: 13, color: 'var(--text-primary)',
+              background: 'transparent', border: '1px solid var(--border)', cursor: 'pointer', padding: '10px 14px',
+              borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12,
+              fontWeight: 600
+            }}
+            whileHover={{ scale: 1.02, background: 'var(--accent-light)' }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {theme === 'dark' ? <Moon size={16} /> : <Sun size={16} />} 
+              {theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+            </div>
+          </motion.button>
+
           {/* Install PWA */}
           {deferredPrompt && (
             <motion.button
