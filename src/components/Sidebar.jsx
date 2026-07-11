@@ -258,23 +258,24 @@ export default function Sidebar() {
             display: 'block', padding: '8px 6px 6px',
           }}>Menu Utama</span>
           {DESIGNER_NAV.map((item, i) => (
-            <NavLink key={item.to} to={item.to} end={item.to === '/'}>
+            <NavLink key={item.to} to={item.to} end={item.to === '/'} style={{ textDecoration: 'none' }}>
               {({ isActive }) => (
                 <motion.div
                   className={`nav-item ${isActive ? 'active' : ''}`}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.06, type: 'spring', stiffness: 300 }}
-                  whileHover={{ x: 4 }}
+                  whileHover={!isActive ? { x: 4, backgroundColor: 'var(--accent-light)', color: 'var(--accent)' } : { x: 0 }}
                   whileTap={{ scale: 0.97 }}
                   style={{
-                    color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                    color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
                     background: isActive ? 'var(--accent-light)' : 'transparent',
                     fontWeight: isActive ? 700 : 500,
                     borderLeft: isActive ? `3px solid var(--accent)` : '3px solid transparent',
                     paddingLeft: 10,
                     borderRadius: 8,
                     marginBottom: 2,
+                    transition: 'color 0.15s, background 0.15s',
                   }}
                 >
                   <item.icon size={17} style={{ flexShrink: 0 }} />
