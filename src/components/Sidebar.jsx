@@ -4,6 +4,8 @@ import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, H
 import { isGoogleSignedIn, signInToGoogle, signOutGoogle, initGoogleAPI } from '../lib/drive'
 import { useState, useEffect } from 'react'
 import { MonitorDown, Moon, Sun } from 'lucide-react'
+import { getOrders, supabase } from '../lib/supabase'
+import { getDeadlineAlertOrders } from '../lib/notifications'
 
 const DESIGNER_NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -48,48 +50,34 @@ function DriveSetupModal({ onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {[
             {
-              step: 1,
-              title: 'Buka Google Cloud Console',
-              desc: 'Pergi ke console.cloud.google.com → pilih project-mu',
+              title: 'Tambahkan URI ke Authorized Origins',
+              desc: 'Buka Google Cloud Console > Credentials > Edit OAuth 2.0 Client ID. Tambahkan URI berikut ke "Authorized JavaScript origins":',
+              copy: window.location.origin
             },
             {
-              step: 2,
-              title: 'Edit OAuth 2.0 Client ID',
-              desc: 'Klik OAuth Client ID yang kamu punya → di "Authorized JavaScript origins" klik Add URI',
+              title: 'Tunggu beberapa menit',
+              desc: 'Setelah di-save, tunggu sekitar 5 menit agar perubahan di Google Cloud Console tersimpan sempurna.',
             },
             {
-              step: 3,
-              title: 'Tambah URI ini',
-              code: 'http://localhost:5173',
-              desc: 'Copy URI di atas, paste, lalu klik Save',
-            },
-            {
-              step: 4,
-              title: 'Tunggu 1-2 menit',
-              desc: 'Google butuh waktu singkat untuk propagasi. Setelah itu coba connect lagi.',
-            },
-          ].map(s => (
-            <div key={s.step} style={{
-              display: 'flex', gap: 12, padding: '12px 14px',
-              background: 'var(--bg-tertiary)', borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border)',
-            }}>
-              <div style={{
-                width: 26, height: 26, borderRadius: '50%', background: 'var(--accent)',
-                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 12, fontWeight: 800, flexShrink: 0,
-              }}>{s.step}</div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-primary)', marginBottom: 3 }}>{s.title}</div>
-                {s.code && (
-                  <div style={{
-                    fontFamily: 'monospace', background: 'var(--bg-secondary)', padding: '4px 10px',
-                    borderRadius: 6, fontSize: 13, color: 'var(--accent)', marginBottom: 4,
-                    border: '1px solid var(--border)', display: 'inline-block',
-                  }}>{s.code}</div>
-                )}
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{s.desc}</div>
+              title: 'Clear Cache / Hard Reload',
+              desc: 'Lakukan hard reload (Ctrl+Shift+R atau Cmd+Shift+R) untuk memastikan browser mengambil config terbaru.',
+            }
+          ].map((step, i) => (
+            <div key={i} style={{ padding: 14, background: 'var(--bg-secondary)', borderRadius: 12, border: '1px solid var(--border)' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 4, display: 'flex', gap: 8 }}>
+                <div style={{ width: 18, height: 18, background: 'var(--accent)', color: 'white', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11 }}>{i + 1}</div>
+                {step.title}
               </div>
+              <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginLeft: 26 }}>{step.desc}</p>
+              {step.copy && (
+                <div style={{ marginLeft: 26, marginTop: 8, padding: '8px 12px', background: 'var(--bg-tertiary)', borderRadius: 6, fontSize: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid var(--border)' }}>
+                  <code style={{ color: 'var(--accent)', fontWeight: 600 }}>{step.copy}</code>
+                  <button className="btn btn-sm" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => {
+                    navigator.clipboard.writeText(step.copy)
+                    toast.success('URI disalin!')
+                  }}>Copy</button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -108,6 +96,7 @@ export default function Sidebar() {
     return localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   })
   const [hoveredNav, setHoveredNav] = useState(null)
+  const [deadlineAlerts, setDeadlineAlerts] = useState(0)
 
   const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark'
@@ -121,6 +110,25 @@ export default function Sidebar() {
       e.preventDefault()
       setDeferredPrompt(e)
     })
+
+    const fetchAlerts = async () => {
+      try {
+        const orders = await getOrders({ role: 'designer' })
+        setDeadlineAlerts(getDeadlineAlertOrders(orders))
+      } catch (e) {
+        // ignore
+      }
+    }
+    fetchAlerts()
+
+    const channel = supabase
+      .channel('public:orders:alerts')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchAlerts)
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   useEffect(() => {
@@ -296,10 +304,20 @@ export default function Sidebar() {
                         boxShadow: isHovered ? '0 4px 16px rgba(37,99,235,0.35)' : 'none',
                         transform: isHovered ? 'translateX(4px)' : 'translateX(0)',
                         transition: 'all 0.18s cubic-bezier(0.4,0,0.2,1)',
+                        position: 'relative'
                       }}
                     >
                       <item.icon size={17} style={{ flexShrink: 0 }} />
-                      {item.label}
+                      <span style={{ flex: 1 }}>{item.label}</span>
+                      {item.to === '/orders' && deadlineAlerts > 0 && (
+                        <span style={{
+                          background: '#ef4444', color: 'white',
+                          fontSize: 10, fontWeight: 800, padding: '2px 6px',
+                          borderRadius: 99, boxShadow: '0 2px 8px rgba(239,68,68,0.4)',
+                        }}>
+                          {deadlineAlerts}
+                        </span>
+                      )}
                     </div>
                   </motion.div>
                 )

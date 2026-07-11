@@ -9,7 +9,9 @@ import OrderForm from './pages/OrderForm'
 import OrderDetail from './pages/OrderDetail'
 import Reports from './pages/Reports'
 import DriveManager from './pages/DriveManager'
+import OfflineBanner from './components/OfflineBanner'
 import { initGoogleAPI } from './lib/drive'
+import { requestNotificationPermission, checkDeadlineNotifications } from './lib/notifications'
 import './index.css'
 
 function AnimatedRoutes() {
@@ -41,10 +43,23 @@ export default function App() {
     } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       document.documentElement.setAttribute('data-theme', 'dark')
     }
+
+    // Request notification permission & cek deadline
+    const initNotifications = async () => {
+      const granted = await requestNotificationPermission()
+      if (granted) {
+        checkDeadlineNotifications()
+        // Cek setiap 30 menit
+        const interval = setInterval(checkDeadlineNotifications, 30 * 60 * 1000)
+        return () => clearInterval(interval)
+      }
+    }
+    initNotifications()
   }, [])
 
   return (
     <BrowserRouter>
+      <OfflineBanner />
       <div className="app-layout">
         <Sidebar />
         <div className="main-content">
@@ -52,7 +67,6 @@ export default function App() {
         </div>
       </div>
       <Toaster
-
         position="top-right"
         toastOptions={{
           style: {
@@ -72,3 +86,4 @@ export default function App() {
     </BrowserRouter>
   )
 }
+

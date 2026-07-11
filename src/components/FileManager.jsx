@@ -35,7 +35,7 @@ const formatBytes = (bytes) => {
 }
 
 function PreviewModal({ file, onClose }) {
-  const cat = getFileCategory(file.mimeType, file.file_name)
+  const cat = getFileCategory(file.mime_type, file.file_name)
   return (
     <motion.div
       style={{
