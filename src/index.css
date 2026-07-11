@@ -179,18 +179,7 @@ body {
   overflow: hidden;
 }
 
-/* Designer sidebar = always dark indigo */
-:root[data-role="designer"] .sidebar,
-:root:not([data-role]) .sidebar {
-  background: #0f1729;
-  border-right-color: #1e2d47;
-}
 
-/* Admin sidebar = always dark green */
-:root[data-role="admin"] .sidebar {
-  background: #061510;
-  border-right-color: #134d37;
-}
 
 .sidebar-logo {
   padding: 20px 20px 16px;

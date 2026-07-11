@@ -198,14 +198,14 @@ export default function Sidebar() {
         {/* ── Header / Logo ── */}
         <div style={{
           padding: '0 0 0 0',
-          background: 'linear-gradient(160deg, #151f38 0%, #0d1527 100%)',
-          borderBottom: '1px solid #1e2d47',
+          background: 'var(--bg-sidebar)',
+          borderBottom: '1px solid var(--border)',
         }}>
           {/* Role badge strip */}
           <div style={{
             padding: '6px 14px',
-            background: 'linear-gradient(90deg, #6366f120, transparent)',
-            borderBottom: '1px solid #1a2847',
+            background: 'linear-gradient(90deg, var(--accent-light), transparent)',
+            borderBottom: '1px solid var(--border)',
             display: 'flex', alignItems: 'center', gap: 6,
           }}>
             <div style={{
@@ -216,7 +216,7 @@ export default function Sidebar() {
             <span style={{
               fontSize: 9, fontWeight: 800, letterSpacing: 2,
               textTransform: 'uppercase',
-              color: '#818cf8',
+              color: 'var(--accent)',
             }}>
               DESIGNER PANEL
             </span>
@@ -239,11 +239,11 @@ export default function Sidebar() {
             <div>
               <div style={{
                 fontWeight: 900, fontSize: 16, letterSpacing: -0.5,
-                color: '#fff', lineHeight: 1.2,
+                color: 'var(--text-primary)', lineHeight: 1.2,
               }}>Si Rekap</div>
               <div style={{
                 fontSize: 10, fontWeight: 600, marginTop: 2,
-                color: '#a5b4fc',
+                color: 'var(--text-secondary)',
                 letterSpacing: 0.3,
               }}>
                 Design Manager
@@ -254,10 +254,8 @@ export default function Sidebar() {
 
         {/* ── Nav ── */}
         <nav className="sidebar-nav" style={{ padding: '12px 10px' }}>
-          <span style={{
-            display: 'block', fontSize: 9, fontWeight: 800, letterSpacing: 1.5,
-            textTransform: 'uppercase', padding: '8px 6px 6px',
-            color: '#2d4068',
+          <span className="nav-section-label" style={{
+            display: 'block', padding: '8px 6px 6px',
           }}>Menu Utama</span>
           {DESIGNER_NAV.map((item, i) => (
             <NavLink key={item.to} to={item.to} end={item.to === '/'}>
@@ -270,10 +268,10 @@ export default function Sidebar() {
                   whileHover={{ x: 4 }}
                   whileTap={{ scale: 0.97 }}
                   style={{
-                    color: isActive ? '#818cf8' : '#94a3b8',
-                    background: isActive ? 'rgba(99,102,241,0.12)' : 'transparent',
+                    color: isActive ? 'var(--accent)' : 'var(--text-muted)',
+                    background: isActive ? 'var(--accent-light)' : 'transparent',
                     fontWeight: isActive ? 700 : 500,
-                    borderLeft: isActive ? `3px solid #6366f1` : '3px solid transparent',
+                    borderLeft: isActive ? `3px solid var(--accent)` : '3px solid transparent',
                     paddingLeft: 10,
                     borderRadius: 8,
                     marginBottom: 2,
