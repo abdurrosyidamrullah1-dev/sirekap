@@ -1,20 +1,18 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Package, FolderOpen, CheckCircle2, Clock,
   AlertCircle, Plus, X, Save, Edit2, Trash2, Info,
-  FileText as FileTab, Workflow, Printer, Store,
-  MessageCircle, Download, Receipt, Send
+  Workflow, Printer, Store,
 } from 'lucide-react'
 import {
   getOrderById, updateOrder, updateOrderItem, deleteOrderItem,
-  addOrderItem, getStatusConfig, ORDER_STATUSES, supabase, deleteOrder
+  addOrderItem, getStatusConfig, ORDER_STATUSES, deleteOrder
 } from '../lib/supabase'
 import FileManager from '../components/FileManager'
 import WorkflowTracker from '../components/WorkflowTracker'
-
-import { isGoogleSignedIn, getAccessToken } from '../lib/drive'
+import { isGoogleSignedIn } from '../lib/drive'
 import toast from 'react-hot-toast'
 
 const ITEM_STATUS = [
@@ -29,6 +27,129 @@ const TABS = [
   { key: 'workflow', label: 'Workflow',      icon: Workflow },
 ]
 
+const MESIN_OPTIONS = ['Mesin A3', 'Mesin Grafir', 'Mesin UV', 'Mesin Banner', 'Mesin DTF']
+
+// ─── Inline Edit Form per Item ────────────────────────────────────────────────
+function ItemEditForm({ item, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    item_name: item.item_name || '',
+    quantity: item.quantity || 1,
+    notes: item.notes || '',
+    production_type: item.production_type || 'in_house',
+    production_location: item.production_location || 'Mesin A3',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    if (!form.item_name.trim()) { toast.error('Nama item wajib diisi'); return }
+    setSaving(true)
+    try {
+      await onSave(form)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      style={{ overflow: 'hidden' }}
+    >
+      <div style={{
+        background: 'var(--accent-light)', borderRadius: 12, padding: 14,
+        border: '1.5px solid var(--blue-200)', marginBottom: 8,
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          ✏️ Edit Item
+        </div>
+
+        {/* Row 1: nama, qty, catatan */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 1fr', gap: 8, marginBottom: 10 }}>
+          <input
+            className="form-input"
+            placeholder="Nama item..."
+            value={form.item_name}
+            onChange={e => setForm(p => ({ ...p, item_name: e.target.value }))}
+            autoFocus
+          />
+          <input
+            type="number" className="form-input" min="1"
+            value={form.quantity}
+            onChange={e => setForm(p => ({ ...p, quantity: parseInt(e.target.value) || 1 }))}
+          />
+          <input
+            className="form-input"
+            placeholder="Catatan..."
+            value={form.notes}
+            onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+          />
+        </div>
+
+        {/* Row 2: lokasi produksi */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button
+              className={`btn ${form.production_type === 'in_house' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '4px 10px', fontSize: 12, minHeight: 32 }}
+              onClick={() => setForm(p => ({ ...p, production_type: 'in_house', production_location: 'Mesin A3' }))}
+            >
+              <Printer size={13} /> Cetak Sini
+            </button>
+            <button
+              className={`btn ${form.production_type === 'outsourced' ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ padding: '4px 10px', fontSize: 12, minHeight: 32 }}
+              onClick={() => setForm(p => ({ ...p, production_type: 'outsourced', production_location: '' }))}
+            >
+              <Store size={13} /> Cetak Luar
+            </button>
+          </div>
+          <div style={{ flex: 1, minWidth: 160 }}>
+            {form.production_type === 'in_house' ? (
+              <select
+                className="form-select"
+                style={{ margin: 0, padding: '4px 10px', fontSize: 12, minHeight: 32 }}
+                value={form.production_location}
+                onChange={e => setForm(p => ({ ...p, production_location: e.target.value }))}
+              >
+                {MESIN_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            ) : (
+              <input
+                className="form-input"
+                placeholder="Nama Vendor / Tempat cetak"
+                style={{ margin: 0, padding: '4px 10px', fontSize: 12, minHeight: 32 }}
+                value={form.production_location}
+                onChange={e => setForm(p => ({ ...p, production_location: e.target.value }))}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 7 }}>
+          <button className="btn btn-secondary btn-sm" onClick={onCancel}>
+            <X size={13} /> Batal
+          </button>
+          <motion.button
+            className="btn btn-primary btn-sm"
+            onClick={handleSave}
+            disabled={saving}
+            whileTap={{ scale: 0.95 }}
+          >
+            {saving
+              ? <span className="spinner" style={{ width: 12, height: 12, borderWidth: 2 }} />
+              : <Save size={13} />
+            } Simpan
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function OrderDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -41,7 +162,7 @@ export default function OrderDetail() {
   const [newItem, setNewItem] = useState({ item_name: '', quantity: 1, notes: '', production_type: 'in_house', production_location: 'Mesin A3' })
   const [saving, setSaving] = useState(false)
   const [deletingOrder, setDeletingOrder] = useState(false)
-  const invoiceRef = useRef(null)
+  const [editingItemId, setEditingItemId] = useState(null) // track item yang sedang diedit
 
   const load = async () => {
     try {
@@ -63,20 +184,9 @@ export default function OrderDetail() {
 
   useEffect(() => {
     load()
-
-    const channel = supabase
-      .channel(`public:orders:${id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => {
-        load()
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items', filter: `order_id=eq.${id}` }, () => {
-        load()
-      })
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    // Poll setiap 30 detik sebagai pengganti realtime (backend tidak expose Supabase realtime)
+    const interval = setInterval(load, 30000)
+    return () => clearInterval(interval)
   }, [id])
 
   const handleSaveOrder = async () => {
@@ -100,7 +210,20 @@ export default function OrderDetail() {
     } catch { toast.error('Gagal update status item') }
   }
 
+  const handleSaveItem = async (itemId, updates) => {
+    try {
+      const updated = await updateOrderItem(itemId, updates)
+      setOrder(prev => ({
+        ...prev,
+        order_items: prev.order_items.map(it => it.id === itemId ? { ...it, ...updated } : it)
+      }))
+      setEditingItemId(null)
+      toast.success('Item diperbarui!')
+    } catch { toast.error('Gagal update item') }
+  }
+
   const handleDeleteItem = async (itemId) => {
+    if (!confirm('Hapus item ini?')) return
     try {
       await deleteOrderItem(itemId)
       setOrder(prev => ({ ...prev, order_items: prev.order_items.filter(it => it.id !== itemId) }))
@@ -140,8 +263,6 @@ export default function OrderDetail() {
       setDeletingOrder(false)
     }
   }
-
-
 
   const formatDate = (d) => {
     if (!d) return '-'
@@ -205,7 +326,7 @@ export default function OrderDetail() {
                 </h2>
               )}
               <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
-                #{ order.id.slice(0, 8).toUpperCase() } · Dibuat {formatDate(order.created_at)}
+                #{order.id.slice(0, 8).toUpperCase()} · Dibuat {formatDate(order.created_at)}
               </div>
 
               {editMode ? (
@@ -352,6 +473,7 @@ export default function OrderDetail() {
 
       {/* Tab Content */}
       <AnimatePresence mode="wait">
+
         {/* ── INFO TAB ── */}
         {tab === 'info' && (
           <motion.div
@@ -373,6 +495,7 @@ export default function OrderDetail() {
                   <Plus size={14} /> Tambah Item
                 </motion.button>
               </div>
+
               <div className="card-body" style={{ padding: '12px 20px' }}>
                 {/* Add item form */}
                 <AnimatePresence>
@@ -385,6 +508,9 @@ export default function OrderDetail() {
                         background: 'var(--accent-light)', borderRadius: 12, padding: 14,
                         border: '1.5px solid var(--blue-200)',
                       }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          ➕ Tambah Item Baru
+                        </div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 72px 1fr', gap: 8, marginBottom: 10 }}>
                           <input className="form-input" placeholder="Nama item..." value={newItem.item_name}
                             onChange={e => setNewItem(p => ({ ...p, item_name: e.target.value }))} autoFocus
@@ -395,7 +521,7 @@ export default function OrderDetail() {
                             onChange={e => setNewItem(p => ({ ...p, notes: e.target.value }))}
                             onKeyDown={e => e.key === 'Enter' && handleAddItem()} />
                         </div>
-                        
+
                         {/* Production Info */}
                         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
                           <div style={{ display: 'flex', gap: 6 }}>
@@ -414,31 +540,25 @@ export default function OrderDetail() {
                               <Store size={13} /> Cetak Luar
                             </button>
                           </div>
-                          
+
                           <div style={{ flex: 1, display: 'flex', gap: 8, minWidth: 200 }}>
                             {newItem.production_type === 'in_house' ? (
-                              <select 
-                                className="form-select" 
+                              <select
+                                className="form-select"
                                 style={{ flex: 1, margin: 0, padding: '4px 10px', fontSize: 12, minHeight: 32 }}
                                 value={newItem.production_location}
                                 onChange={e => setNewItem(p => ({ ...p, production_location: e.target.value }))}
                               >
-                                <option value="Mesin A3">Mesin A3</option>
-                                <option value="Mesin Grafir">Mesin Grafir</option>
-                                <option value="Mesin UV">Mesin UV</option>
-                                <option value="Mesin Banner">Mesin Banner</option>
-                                <option value="Mesin DTF">Mesin DTF</option>
+                                {MESIN_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
                               </select>
                             ) : (
-                              <>
-                                <input
-                                  className="form-input"
-                                  placeholder="Nama Vendor / Tempat"
-                                  style={{ flex: 1, margin: 0, padding: '4px 10px', fontSize: 12, minHeight: 32 }}
-                                  value={newItem.production_location}
-                                  onChange={e => setNewItem(p => ({ ...p, production_location: e.target.value }))}
-                                />
-                              </>
+                              <input
+                                className="form-input"
+                                placeholder="Nama Vendor / Tempat"
+                                style={{ flex: 1, margin: 0, padding: '4px 10px', fontSize: 12, minHeight: 32 }}
+                                value={newItem.production_location}
+                                onChange={e => setNewItem(p => ({ ...p, production_location: e.target.value }))}
+                              />
                             )}
                           </div>
                         </div>
@@ -451,7 +571,7 @@ export default function OrderDetail() {
                   )}
                 </AnimatePresence>
 
-                {/* Items */}
+                {/* Items List */}
                 {order.order_items?.length === 0 ? (
                   <div className="empty-state" style={{ padding: '24px 0' }}>
                     <p>Belum ada item. Klik "Tambah Item" untuk menambahkan.</p>
@@ -461,78 +581,140 @@ export default function OrderDetail() {
                     {order.order_items?.map((item, i) => {
                       const sc = ITEM_STATUS.find(s => s.value === item.status) || ITEM_STATUS[0]
                       const StatusIcon = sc.icon
+                      const isEditing = editingItemId === item.id
+
                       return (
                         <motion.div
                           key={item.id}
-                          className="file-item"
                           initial={{ opacity: 0, x: -16 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: 16, height: 0 }}
-                          transition={{ delay: i * 0.05 }}
-                          style={{ marginBottom: 8, alignItems: 'flex-start' }}
+                          transition={{ delay: i * 0.04 }}
+                          style={{ marginBottom: 10 }}
                         >
-                          {/* Status icon */}
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                            background: item.status === 'done' ? 'rgba(16,185,129,.12)' :
-                                        item.status === 'in_progress' ? 'rgba(59,130,246,.12)' : 'var(--bg-tertiary)',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            <StatusIcon size={16} style={{ color: sc.color }} />
-                          </div>
-
-                          {/* Info */}
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                              <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>{item.item_name}</span>
-                              <span style={{
-                                fontSize: 11, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
-                                padding: '1px 7px', borderRadius: 99, fontWeight: 700,
-                              }}>×{item.quantity}</span>
-                            </div>
-                            {item.notes && (
-                              <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 7 }}>{item.notes}</div>
+                          {/* Edit form (inline) */}
+                          <AnimatePresence>
+                            {isEditing && (
+                              <ItemEditForm
+                                item={item}
+                                onSave={(updates) => handleSaveItem(item.id, updates)}
+                                onCancel={() => setEditingItemId(null)}
+                              />
                             )}
-                            {item.production_type && (
-                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 600, padding: '3px 8px', borderRadius: 6, marginBottom: 10, background: item.production_type === 'in_house' ? 'var(--bg-card)' : '#f59e0b15', color: item.production_type === 'in_house' ? 'var(--text-secondary)' : '#f59e0b', border: `1px solid ${item.production_type === 'in_house' ? 'var(--border)' : '#f59e0b30'}` }}>
-                                {item.production_type === 'in_house' ? <Printer size={12} /> : <Store size={12} />}
-                                {item.production_type === 'in_house' ? 'Cetak Dalam' : 'Cetak Luar'} • {item.production_location || 'Belum dipilih'}
+                          </AnimatePresence>
+
+                          {/* Item row (selalu tampil, edit form di atasnya) */}
+                          {!isEditing && (
+                            <div
+                              className="file-item"
+                              style={{ alignItems: 'flex-start', borderRadius: 12, padding: '12px 14px' }}
+                            >
+                              {/* Status icon */}
+                              <div style={{
+                                width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                                background: item.status === 'done' ? 'rgba(16,185,129,.12)' :
+                                            item.status === 'in_progress' ? 'rgba(59,130,246,.12)' : 'var(--bg-tertiary)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              }}>
+                                <StatusIcon size={16} style={{ color: sc.color }} />
                               </div>
-                            )}
-                            {/* Status toggle buttons */}
-                            <div style={{ display: 'flex', gap: 5 }}>
-                              {ITEM_STATUS.map(s => {
-                                const SIcon = s.icon
-                                return (
-                                  <motion.button
-                                    key={s.value}
-                                    onClick={() => handleItemStatus(item.id, s.value)}
-                                    whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
-                                    style={{
-                                      display: 'flex', alignItems: 'center', gap: 4,
-                                      padding: '4px 10px', borderRadius: 99,
-                                      fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
-                                      background: item.status === s.value ? s.color : 'var(--bg-tertiary)',
-                                      color: item.status === s.value ? 'white' : 'var(--text-muted)',
-                                      transition: 'all 0.2s',
-                                    }}
-                                  >
-                                    <SIcon size={10} /> {s.label}
-                                  </motion.button>
-                                )
-                              })}
-                            </div>
-                          </div>
 
-                          {/* Delete */}
-                          <motion.button
-                            className="btn btn-ghost btn-icon"
-                            onClick={() => handleDeleteItem(item.id)}
-                            whileHover={{ scale: 1.1, color: 'var(--danger)' }}
-                            style={{ color: 'var(--text-muted)', padding: 6 }}
-                          >
-                            <Trash2 size={14} />
-                          </motion.button>
+                              {/* Info */}
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                {/* Nama + qty */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                  <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)' }}>
+                                    {item.item_name}
+                                  </span>
+                                  <span style={{
+                                    fontSize: 11, background: 'var(--bg-tertiary)', color: 'var(--text-secondary)',
+                                    padding: '1px 7px', borderRadius: 99, fontWeight: 700,
+                                  }}>×{item.quantity}</span>
+                                </div>
+
+                                {/* Catatan */}
+                                {item.notes && (
+                                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
+                                    📝 {item.notes}
+                                  </div>
+                                )}
+
+                                {/* Lokasi produksi */}
+                                {item.production_type ? (
+                                  <div style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                                    fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 6, marginBottom: 8,
+                                    background: item.production_type === 'in_house' ? 'rgba(59,130,246,0.08)' : 'rgba(245,158,11,0.1)',
+                                    color: item.production_type === 'in_house' ? '#3b82f6' : '#f59e0b',
+                                    border: `1px solid ${item.production_type === 'in_house' ? 'rgba(59,130,246,0.2)' : 'rgba(245,158,11,0.25)'}`,
+                                  }}>
+                                    {item.production_type === 'in_house' ? <Printer size={11} /> : <Store size={11} />}
+                                    {item.production_type === 'in_house' ? 'Cetak Sini' : 'Cetak Luar'}
+                                    {item.production_location && (
+                                      <>
+                                        <span style={{ opacity: 0.5 }}>•</span>
+                                        <span>{item.production_location}</span>
+                                      </>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                                    fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 6, marginBottom: 8,
+                                    background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
+                                  }}>
+                                    <AlertCircle size={11} /> Lokasi belum diisi
+                                  </div>
+                                )}
+
+                                {/* Status toggle buttons */}
+                                <div style={{ display: 'flex', gap: 5 }}>
+                                  {ITEM_STATUS.map(s => {
+                                    const SIcon = s.icon
+                                    return (
+                                      <motion.button
+                                        key={s.value}
+                                        onClick={() => handleItemStatus(item.id, s.value)}
+                                        whileHover={{ scale: 1.08 }} whileTap={{ scale: 0.92 }}
+                                        style={{
+                                          display: 'flex', alignItems: 'center', gap: 4,
+                                          padding: '4px 10px', borderRadius: 99,
+                                          fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer',
+                                          background: item.status === s.value ? s.color : 'var(--bg-tertiary)',
+                                          color: item.status === s.value ? 'white' : 'var(--text-muted)',
+                                          transition: 'all 0.2s',
+                                        }}
+                                      >
+                                        <SIcon size={10} /> {s.label}
+                                      </motion.button>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Action buttons: Edit + Delete */}
+                              <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                <motion.button
+                                  className="btn btn-ghost btn-icon"
+                                  onClick={() => setEditingItemId(item.id)}
+                                  whileHover={{ scale: 1.1, color: 'var(--accent)' }}
+                                  style={{ color: 'var(--text-muted)', padding: 6 }}
+                                  title="Edit item"
+                                >
+                                  <Edit2 size={14} />
+                                </motion.button>
+                                <motion.button
+                                  className="btn btn-ghost btn-icon"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  whileHover={{ scale: 1.1, color: 'var(--danger)' }}
+                                  style={{ color: 'var(--text-muted)', padding: 6 }}
+                                  title="Hapus item"
+                                >
+                                  <Trash2 size={14} />
+                                </motion.button>
+                              </div>
+                            </div>
+                          )}
                         </motion.div>
                       )
                     })}
@@ -542,9 +724,6 @@ export default function OrderDetail() {
             </div>
           </motion.div>
         )}
-
-
-
 
         {/* ── FILES TAB ── */}
         {tab === 'files' && (
