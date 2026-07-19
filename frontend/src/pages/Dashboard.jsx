@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LayoutDashboard, TrendingUp, Package, Clock, CheckCircle2, PlusCircle, ArrowRight, Zap, FolderOpen, Bell, Calendar } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { getOrders, getOrderStats, supabase, getStatusConfig } from '../lib/supabase'
+import { getOrders, getOrderStats, getStatusConfig } from '../lib/supabase'
 import StatCard from '../components/StatCard'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -36,12 +36,14 @@ export default function Dashboard() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    let mounted = true
     const load = async () => {
       try {
         const [statRes, ordersRes] = await Promise.all([
           getOrderStats('designer'),
           getOrders({ role: 'designer' })
         ])
+        if (!mounted) return
         setStats(statRes.stats)
         setChartData(statRes.chartData.map(d => ({
           date: new Date(d.date).toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric' }),
@@ -51,20 +53,16 @@ export default function Dashboard() {
       } catch (e) {
         console.error(e)
       } finally {
-        setLoading(false)
+        if (mounted) setLoading(false)
       }
     }
     load()
 
-    const channel = supabase
-      .channel('public:orders:dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: 'order_role=eq.designer' }, () => {
-        load()
-      })
-      .subscribe()
+    const interval = setInterval(load, 15000) // Polling setiap 15 detik sebagai pengganti real-time
 
     return () => {
-      supabase.removeChannel(channel)
+      mounted = false
+      clearInterval(interval)
     }
   }, [])
 
