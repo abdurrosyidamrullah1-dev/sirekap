@@ -1,0 +1,549 @@
+import { useState, useCallback, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Upload, X, FileText, Image, File, Music, Video,
+  Loader2, Grid, List, ExternalLink, Trash2, Download,
+  FolderOpen, Eye, Search, SortAsc, CheckSquare
+} from 'lucide-react'
+import { uploadFileToDrive, createOrderFolder, isGoogleSignedIn, getDriveFilesByFolder, deleteDriveFile } from '../lib/drive'
+import { addOrderFile, deleteOrderFile, updateOrder } from '../lib/supabase'
+import toast from 'react-hot-toast'
+import ConfirmModal from './ConfirmModal'
+
+const FILE_ICONS = {
+  image: Image,
+  video: Video,
+  audio: Music,
+  pdf: FileText,
+  text: FileText,
+  default: File,
+}
+
+const getFileCategory = (mimeType = '', name = '') => {
+  if (mimeType.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(name)) return 'image'
+  if (mimeType.startsWith('video/') || /\.(mp4|mov|avi|mkv)$/i.test(name)) return 'video'
+  if (mimeType.startsWith('audio/') || /\.(mp3|wav|flac)$/i.test(name)) return 'audio'
+  if (mimeType === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf'
+  return 'default'
+}
+
+const formatBytes = (bytes) => {
+  if (!bytes) return '-'
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1048576).toFixed(1) + ' MB'
+}
+
+function PreviewModal({ file, onClose }) {
+  const cat = getFileCategory(file.mime_type, file.file_name)
+  return (
+    <motion.div
+      style={{
+        position: 'fixed', inset: 0, zIndex: 400,
+        background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+      }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        onClick={e => e.stopPropagation()}
+        initial={{ scale: 0.85 }} animate={{ scale: 1 }}
+        style={{ maxWidth: '85vw', maxHeight: '85vh', position: 'relative' }}
+      >
+        <div style={{ position: 'absolute', top: -48, right: 0, display: 'flex', gap: 8 }}>
+          {file.drive_file_url && (
+            <a href={file.drive_file_url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">
+              <ExternalLink size={13} /> Buka di Drive
+            </a>
+          )}
+          <button className="btn btn-secondary btn-sm" onClick={onClose}><X size={13} /> Tutup</button>
+        </div>
+        {cat === 'image' && file.drive_file_url ? (
+          <img src={`https://drive.google.com/uc?id=${file.drive_file_id}&export=view`} alt={file.file_name} style={{ maxWidth: '85vw', maxHeight: '80vh', borderRadius: 12, objectFit: 'contain' }} onError={e => { e.target.style.display = 'none' }} />
+        ) : (
+          <div style={{ background: 'var(--bg-card)', borderRadius: 16, padding: '48px 64px', textAlign: 'center', border: '1px solid var(--border)' }}>
+            {(() => { const Icon = FILE_ICONS[cat] || File; return <Icon size={64} style={{ color: 'var(--accent)', marginBottom: 16 }} /> })()}
+            <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 8 }}>{file.file_name}</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>Preview tidak tersedia untuk tipe file ini</div>
+            {file.drive_file_url && (
+              <a href={file.drive_file_url} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ marginTop: 16, display: 'inline-flex' }}><ExternalLink size={14} /> Buka di Drive</a>
+            )}
+          </div>
+        )}
+        <div style={{ textAlign: 'center', marginTop: 12, color: 'rgba(255,255,255,0.7)', fontSize: 13 }}>{file.file_name}</div>
+      </motion.div>
+    </motion.div>
+  )
+}
+
+export default function FileManager({ order, onFilesChanged }) {
+  const [dragOver, setDragOver] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(null)
+  const [viewMode, setViewMode] = useState('grid')
+  const [preview, setPreview] = useState(null)
+  const [search, setSearch] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, target: null, title: '', message: '' })
+  const [selectedFiles, setSelectedFiles] = useState(new Set())
+  const [dragSelecting, setDragSelecting] = useState(false)
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, file: null })
+  const inputRef = useRef()
+  const folderInputRef = useRef()
+
+  const files = (order.order_files || []).filter(f =>
+    !search || f.file_name.toLowerCase().includes(search.toLowerCase())
+  )
+
+  useEffect(() => {
+    const preventDefault = (e) => { e.preventDefault(); e.stopPropagation() }
+    const handleMouseUp = () => setDragSelecting(false)
+    const handleClick = () => setContextMenu(prev => prev.visible ? { ...prev, visible: false } : prev)
+    
+    window.addEventListener('dragover', preventDefault)
+    window.addEventListener('drop', preventDefault)
+    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('click', handleClick)
+    return () => {
+      window.removeEventListener('dragover', preventDefault)
+      window.removeEventListener('drop', preventDefault)
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('click', handleClick)
+    }
+  }, [])
+
+  const processFiles = useCallback(async (rawFiles) => {
+    if (!isGoogleSignedIn()) {
+      toast.error('Hubungkan Google Drive dulu di sidebar! Klik ikon Drive di bawah kiri.', { duration: 5000 })
+      return
+    }
+
+    const filesArray = Array.from(rawFiles)
+    if (filesArray.length === 0) return
+
+    for (let i = 0; i < filesArray.length; i++) {
+      const file = filesArray[i]
+      const name = file.name
+      setUploadProgress({ name, current: i + 1, total: filesArray.length, percent: 0 })
+      try {
+        let folderId = order.drive_folder_id
+        let folderUrl = order.drive_folder_url
+
+        if (!folderId) {
+          const folder = await createOrderFolder(order.customer_name, order.id)
+          folderId = folder.id
+          folderUrl = folder.url
+          await updateOrder(order.id, { drive_folder_id: folderId, drive_folder_url: folderUrl })
+        }
+
+        const result = await uploadFileToDrive(file, folderId, (percent) => {
+          setUploadProgress(prev => prev ? { ...prev, percent } : null)
+        })
+
+        const record = await addOrderFile({
+          order_id: order.id,
+          file_name: file.name,
+          drive_file_id: result.id,
+          drive_file_url: result.webViewLink,
+          mime_type: file.type,
+          file_size: file.size,
+        })
+
+        onFilesChanged('add', { ...record, drive_file_id: result.id, drive_file_url: result.webViewLink })
+        toast.success(`✅ ${name} berhasil diupload!`)
+      } catch (err) {
+        toast.error(`❌ Gagal upload ${name}: ${err.message}`)
+      }
+    }
+    setUploadProgress(null)
+  }, [order, onFilesChanged])
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    processFiles(e.dataTransfer.files)
+  }
+
+  const handleDeleteClick = (file) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus File',
+      message: `Yakin ingin menghapus "${file.file_name}" dari Google Drive dan record? Tindakan ini tidak dapat dibatalkan.`,
+      target: file
+    })
+  }
+
+  const handleBatchDeleteClick = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Hapus File Terpilih',
+      message: `Yakin ingin menghapus ${selectedFiles.size} file yang dipilih dari Google Drive dan record? Tindakan ini tidak dapat dibatalkan.`,
+      target: 'batch'
+    })
+  }
+
+  const confirmDelete = async () => {
+    const target = confirmModal.target
+    setDeleting(true)
+    
+    try {
+      if (target === 'batch') {
+        const filesToDelete = files.filter(f => selectedFiles.has(f.id))
+        for (const file of filesToDelete) {
+          if (file.drive_file_id) await deleteDriveFile(file.drive_file_id).catch(() => {})
+          await deleteOrderFile(file.id)
+          onFilesChanged('remove', file)
+        }
+        toast.success(`${selectedFiles.size} file berhasil dihapus`)
+        setSelectedFiles(new Set())
+      } else {
+        if (target.drive_file_id) await deleteDriveFile(target.drive_file_id).catch(() => {})
+        await deleteOrderFile(target.id)
+        onFilesChanged('remove', target)
+        toast.success('File berhasil dihapus')
+        setSelectedFiles(prev => { const next = new Set(prev); next.delete(target.id); return next; })
+      }
+    } catch (e) {
+      toast.error('Gagal hapus: ' + e.message)
+    } finally {
+      setDeleting(false)
+      setConfirmModal({ isOpen: false, target: null, title: '', message: '' })
+    }
+  }
+
+  return (
+    <div>
+      <motion.div
+        className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        style={{ marginBottom: 16 }}
+      >
+        <input ref={inputRef} type="file" multiple style={{ display: 'none' }}
+          onChange={e => { processFiles(e.target.files); e.target.value = '' }}
+          accept="image/*,.pdf,.ai,.psd,.svg,.eps,.cdr,.zip,.rar" />
+        <input ref={folderInputRef} type="file" webkitdirectory="true" directory="true" multiple style={{ display: 'none' }}
+          onChange={e => { processFiles(e.target.files); e.target.value = '' }} />
+          
+        <motion.div className="upload-zone-icon" animate={dragOver ? { scale: 1.2, rotate: 15 } : { scale: 1, rotate: 0 }} transition={{ type: 'spring', stiffness: 400 }} onClick={() => inputRef.current?.click()} style={{ cursor: 'pointer' }}>
+          <Upload size={24} />
+        </motion.div>
+        <h4>Drop file atau folder desain di sini</h4>
+        <p>PNG, JPG, PDF, AI, PSD, SVG, CDR, ZIP — klik atau drag</p>
+        
+        <div style={{ display: 'flex', gap: 12, marginTop: 14, justifyContent: 'center' }}>
+          <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); inputRef.current?.click() }} style={{ fontWeight: 600 }}><File size={14} /> Pilih File</button>
+          <button className="btn btn-secondary btn-sm" onClick={(e) => { e.stopPropagation(); folderInputRef.current?.click() }} style={{ fontWeight: 600 }}><FolderOpen size={14} /> Pilih Folder</button>
+        </div>
+      </motion.div>
+
+      <AnimatePresence>
+        {uploadProgress && (
+          <motion.div className="file-item" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} style={{ marginBottom: 12, borderColor: 'var(--accent)', background: 'var(--accent-light)', display: 'block', padding: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8, fontSize: 13, fontWeight: 600 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent)' }}>
+                <Loader2 size={16} className="spin" /> 
+                Mengupload {uploadProgress.current} dari {uploadProgress.total} file
+              </div>
+              <div style={{ color: 'var(--text-secondary)' }}>{uploadProgress.percent}%</div>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {uploadProgress.name}
+            </div>
+            <div style={{ width: '100%', height: 6, background: 'var(--bg-tertiary)', borderRadius: 3, overflow: 'hidden' }}>
+              <motion.div style={{ height: '100%', background: 'var(--accent)', borderRadius: 3 }} initial={{ width: 0 }} animate={{ width: `${uploadProgress.percent}%` }} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {(files.length > 0 || search) && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
+            <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+            <input className="form-input" placeholder="Cari file..." style={{ paddingLeft: 32, height: 36, fontSize: 13 }} value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          
+          {selectedFiles.size > 0 && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--bg-tertiary)', padding: '4px 12px', borderRadius: 8 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--accent)' }}>{selectedFiles.size} dipilih</span>
+              <button className="btn btn-sm btn-ghost" onClick={() => setSelectedFiles(new Set(files.map(f => f.id)))} style={{ fontSize: 11, padding: '4px 8px' }}>Pilih Semua</button>
+              <button className="btn btn-sm btn-ghost" onClick={() => setSelectedFiles(new Set())} style={{ fontSize: 11, padding: '4px 8px' }}>Batal</button>
+              <button className="btn btn-sm" onClick={handleBatchDeleteClick} style={{ background: 'rgba(239, 68, 68, 0.1)', color: 'rgb(239, 68, 68)', border: '1px solid rgba(239, 68, 68, 0.2)', fontSize: 11, padding: '4px 8px' }}>
+                <Trash2 size={12} style={{ marginRight: 4 }}/> Hapus
+              </button>
+            </div>
+          )}
+          
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['grid','list'].map(m => (
+              <motion.button key={m} onClick={() => setViewMode(m)} className={`btn btn-secondary btn-icon btn-sm`} style={{ background: viewMode === m ? 'var(--accent)' : undefined, color: viewMode === m ? 'white' : undefined }} whileHover={{ scale: 1.07 }} whileTap={{ scale: 0.93 }}>
+                {m === 'grid' ? <Grid size={14} /> : <List size={14} />}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {order.order_files?.length > 0 && (
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 10, display: 'flex', gap: 12 }}>
+          <span>{order.order_files.length} file total</span>
+          {order.drive_folder_url && (
+            <a href={order.drive_folder_url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <FolderOpen size={12} /> Lihat folder Drive
+            </a>
+          )}
+        </div>
+      )}
+
+      {files.length === 0 && !uploadProgress && (
+        <div style={{ textAlign: 'center', padding: '20px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+          {search ? 'File tidak ditemukan' : 'Belum ada file. Upload file di atas!'}
+        </div>
+      )}
+
+      {viewMode === 'grid' && files.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, userSelect: 'none' }}>
+          <AnimatePresence>
+            {files.map((file, i) => {
+              const cat = getFileCategory(file.mime_type, file.file_name)
+              const Icon = FILE_ICONS[cat] || File
+              const isSelected = selectedFiles.has(file.id)
+              return (
+                <motion.div key={file.id}
+                  initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.85 }} transition={{ delay: i * 0.04 }}
+                  onClick={() => setPreview(file)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, file })
+                  }}
+                  style={{
+                    background: isSelected ? 'var(--accent-light)' : 'var(--bg-secondary)', 
+                    border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
+                    borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'all 0.2s', position: 'relative'
+                  }}
+                  whileHover={{ y: -3, boxShadow: 'var(--shadow-md)', borderColor: isSelected ? 'var(--accent)' : 'var(--blue-200)' }}
+                >
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedFiles(prev => {
+                        const next = new Set(prev)
+                        if (next.has(file.id)) next.delete(file.id)
+                        else next.add(file.id)
+                        return next
+                      })
+                    }}
+                    style={{
+                      position: 'absolute', top: 8, left: 8, zIndex: 10,
+                      color: isSelected ? 'white' : 'transparent',
+                      background: isSelected ? 'var(--accent)' : 'rgba(255,255,255,0.5)',
+                      border: isSelected ? 'none' : '1px solid var(--border)',
+                      borderRadius: 4, display: 'flex', padding: 2,
+                      boxShadow: isSelected ? '0 2px 8px rgba(37,99,235,0.4)' : 'none',
+                    }}
+                    className="file-grid-select"
+                  >
+                    <CheckSquare size={14} />
+                  </div>
+                  <div style={{ height: 90, background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+                    {(cat === 'image' || cat === 'pdf') && file.drive_file_id ? (
+                      <img src={`https://drive.google.com/thumbnail?id=${file.drive_file_id}&sz=w200`} alt={file.file_name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} draggable="false" />
+                    ) : <Icon size={36} style={{ color: 'var(--accent)', opacity: 0.7 }} />}
+                  </div>
+                  <div style={{ padding: '8px 10px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginBottom: 2 }}>
+                      {file.file_name}
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{formatBytes(file.file_size)}</span>
+                      <div style={{ display: 'flex', gap: 2 }}>
+                        {file.drive_file_url && <a href={file.drive_file_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ color: 'var(--text-muted)', display: 'flex', padding: 2 }}><ExternalLink size={11} /></a>}
+                        <button onClick={e => { e.stopPropagation(); handleDeleteClick(file) }} style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}><Trash2 size={11} /></button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {viewMode === 'list' && files.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, userSelect: 'none' }}>
+          <AnimatePresence>
+            {files.map((file, i) => {
+              const cat = getFileCategory(file.mime_type, file.file_name)
+              const Icon = FILE_ICONS[cat] || File
+              const isSelected = selectedFiles.has(file.id)
+              return (
+                <motion.div key={file.id} className="file-item"
+                  initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 12 }} transition={{ delay: i * 0.04 }}
+                  onClick={() => setPreview(file)}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, file })
+                  }}
+                  style={{
+                    background: isSelected ? 'var(--accent-light)' : 'var(--bg-card)',
+                    border: `1px solid ${isSelected ? 'var(--accent)' : 'transparent'}`,
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
+                    borderRadius: 8
+                  }}
+                >
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedFiles(prev => {
+                        const next = new Set(prev)
+                        if (next.has(file.id)) next.delete(file.id)
+                        else next.add(file.id)
+                        return next
+                      })
+                    }}
+                    style={{
+                      color: isSelected ? 'white' : 'transparent',
+                      background: isSelected ? 'var(--accent)' : 'var(--bg-secondary)',
+                      border: isSelected ? 'none' : '1px solid var(--border)',
+                      borderRadius: 4, display: 'flex', padding: 2,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <CheckSquare size={14} />
+                  </div>
+                  <div className="file-icon" style={{ position: 'relative' }}>
+                    {(cat === 'image' || cat === 'pdf') && file.drive_file_id ? <img src={`https://drive.google.com/thumbnail?id=${file.drive_file_id}&sz=w64`} alt="" style={{ width: 28, height: 28, borderRadius: 4, objectFit: 'cover' }} onError={e => { e.target.style.display = 'none' }} draggable="false" /> : <Icon size={20} />}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className="file-name" style={{ color: isSelected ? 'var(--accent)' : 'var(--text-primary)', fontSize: 13, fontWeight: 600 }}>{file.file_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{formatBytes(file.file_size)} · {new Date(file.uploaded_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                    <motion.button onClick={(e) => { e.stopPropagation(); setPreview(file) }} className="btn btn-ghost btn-icon" style={{ padding: 6 }} whileHover={{ scale: 1.1 }}><Eye size={14} /></motion.button>
+                    {file.drive_file_url && <motion.a href={file.drive_file_url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-icon" style={{ padding: 6 }} whileHover={{ scale: 1.1 }} onClick={e => e.stopPropagation()}><ExternalLink size={14} /></motion.a>}
+                    <motion.button onClick={(e) => { e.stopPropagation(); handleDeleteClick(file) }} className="btn btn-ghost btn-icon" style={{ padding: 6, color: 'var(--text-muted)' }} whileHover={{ scale: 1.1, color: 'var(--danger)' }}><Trash2 size={14} /></motion.button>
+                  </div>
+                </motion.div>
+              )
+            })}
+          </AnimatePresence>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {preview && <PreviewModal file={preview} onClose={() => setPreview(null)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {contextMenu.visible && contextMenu.file && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.1 }}
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              boxShadow: 'var(--shadow-lg)',
+              zIndex: 1000,
+              padding: 4,
+              minWidth: 160,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 2
+            }}
+            onClick={e => e.stopPropagation()}
+            onContextMenu={e => { e.preventDefault(); e.stopPropagation() }}
+          >
+            <button 
+              className="btn btn-ghost btn-sm" 
+              style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13 }}
+              onClick={() => {
+                setSelectedFiles(prev => {
+                  const next = new Set(prev)
+                  if (next.has(contextMenu.file.id)) next.delete(contextMenu.file.id)
+                  else next.add(contextMenu.file.id)
+                  return next
+                })
+                setContextMenu({ visible: false, x: 0, y: 0, file: null })
+              }}
+            >
+              <CheckSquare size={14} style={{ marginRight: 8, color: 'var(--text-muted)' }} /> 
+              {selectedFiles.has(contextMenu.file.id) ? 'Batal Pilih' : 'Pilih File'}
+            </button>
+            
+            <button 
+              className="btn btn-ghost btn-sm" 
+              style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13 }}
+              onClick={() => {
+                setPreview(contextMenu.file)
+                setContextMenu({ visible: false, x: 0, y: 0, file: null })
+              }}
+            >
+              <Eye size={14} style={{ marginRight: 8, color: 'var(--text-muted)' }} /> Lihat / Preview
+            </button>
+
+            {contextMenu.file.drive_file_url && (
+              <a 
+                href={contextMenu.file.drive_file_url} 
+                target="_blank" 
+                rel="noreferrer" 
+                className="btn btn-ghost btn-sm" 
+                style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13 }}
+                onClick={() => setContextMenu({ visible: false, x: 0, y: 0, file: null })}
+              >
+                <ExternalLink size={14} style={{ marginRight: 8, color: 'var(--text-muted)' }} /> Buka di Drive
+              </a>
+            )}
+
+            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+            {selectedFiles.size > 1 && selectedFiles.has(contextMenu.file.id) ? (
+              <button 
+                className="btn btn-ghost btn-sm" 
+                style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13, color: 'var(--danger)' }}
+                onClick={() => {
+                  handleBatchDeleteClick()
+                  setContextMenu({ visible: false, x: 0, y: 0, file: null })
+                }}
+              >
+                <Trash2 size={14} style={{ marginRight: 8 }} /> Hapus {selectedFiles.size} Terpilih
+              </button>
+            ) : (
+              <button 
+                className="btn btn-ghost btn-sm" 
+                style={{ justifyContent: 'flex-start', padding: '6px 12px', fontSize: 13, color: 'var(--danger)' }}
+                onClick={() => {
+                  handleDeleteClick(contextMenu.file)
+                  setContextMenu({ visible: false, x: 0, y: 0, file: null })
+                }}
+              >
+                <Trash2 size={14} style={{ marginRight: 8 }} /> Hapus File
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ isOpen: false, target: null, title: '', message: '' })}
+        onConfirm={confirmDelete}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        isLoading={deleting}
+      />
+
+      <style>{`.file-grid-overlay { opacity: 0 !important; } div:hover > .file-grid-overlay { opacity: 1 !important; }`}</style>
+    </div>
+  )
+}

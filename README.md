@@ -1,16 +1,102 @@
-# React + Vite
+# Si Rekap — Order Manager
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Aplikasi manajemen orderan desain dengan Google Drive integration.
 
-Currently, two official plugins are available:
+## Struktur Proyek
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```
+web kerjaan/
+├── frontend/          ← React + Vite (UI)
+├── backend/           ← Express.js API Server
+├── supabase_setup.sql
+├── migration_invoice.sql
+└── migration_separate_db.sql
+```
 
-## React Compiler
+## Cara Menjalankan
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 1. Setup Backend
 
-## Expanding the Oxlint configuration
+```bash
+cd backend
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+# Copy .env.example dan isi SUPABASE_SERVICE_KEY dari Supabase Dashboard
+cp .env.example .env
+
+# Install dependencies (sudah dilakukan)
+npm install
+
+# Jalankan backend (development)
+npm run dev
+# → Server berjalan di http://localhost:3001
+```
+
+### 2. Setup Frontend
+
+```bash
+cd frontend
+
+# Copy .env.example
+cp .env.example .env
+
+# Install dependencies (sudah dilakukan)
+npm install
+
+# Jalankan frontend (development)
+npm run dev
+# → App berjalan di http://localhost:5173
+```
+
+> **Note:** Jalankan backend DULU, baru frontend. Frontend menggunakan proxy Vite ke `localhost:3001`.
+
+---
+
+## Arsitektur
+
+```
+Browser (React/Vite :5173)
+    │  fetch /api/*  (proxy via Vite dev server)
+    ▼
+Express Backend (:3001)
+    │  @supabase/supabase-js
+    ▼
+Supabase (PostgreSQL)
+
+Browser juga langsung akses Google Drive API (OAuth di browser)
+```
+
+## API Endpoints
+
+| Method | Path | Deskripsi |
+|--------|------|-----------|
+| GET | `/api/health` | Health check |
+| GET | `/api/orders` | List orders (filter: status, search, role) |
+| GET | `/api/orders/:id` | Detail order |
+| POST | `/api/orders` | Buat order baru |
+| PUT | `/api/orders/:id` | Update order |
+| PUT | `/api/orders/:id/status` | Update status + timeline |
+| DELETE | `/api/orders/:id` | Hapus order |
+| POST | `/api/order-items` | Tambah item |
+| PUT | `/api/order-items/:id` | Update item |
+| DELETE | `/api/order-items/:id` | Hapus item |
+| POST | `/api/order-files` | Tambah file reference |
+| DELETE | `/api/order-files/:id` | Hapus file reference |
+| GET | `/api/timeline/:orderId` | Riwayat status |
+| POST | `/api/timeline` | Tambah timeline entry |
+| GET | `/api/reports/stats` | Statistik orders |
+
+## Variabel Lingkungan
+
+### Backend (`backend/.env`)
+| Variabel | Keterangan |
+|----------|------------|
+| `SUPABASE_URL` | URL project Supabase |
+| `SUPABASE_SERVICE_KEY` | Service role key (dari Supabase Dashboard → Settings → API) |
+| `PORT` | Port backend (default: 3001) |
+| `FRONTEND_URL` | URL frontend untuk CORS (default: http://localhost:5173) |
+
+### Frontend (`frontend/.env`)
+| Variabel | Keterangan |
+|----------|------------|
+| `VITE_GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `VITE_API_URL` | URL backend (kosongkan untuk dev — pakai proxy Vite) |
