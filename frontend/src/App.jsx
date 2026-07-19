@@ -9,6 +9,7 @@ import OrderForm from './pages/OrderForm'
 import OrderDetail from './pages/OrderDetail'
 import Reports from './pages/Reports'
 import DriveManager from './pages/DriveManager'
+import Absen from './pages/Absen'
 import OfflineBanner from './components/OfflineBanner'
 import { initGoogleAPI } from './lib/drive'
 import { requestNotificationPermission, checkDeadlineNotifications } from './lib/notifications'
@@ -21,6 +22,7 @@ function AnimatedRoutes() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         <Route path="/"             element={<Dashboard />} />
+        <Route path="/absen"        element={<Absen />} />
         <Route path="/orders"       element={<Orders />} />
         <Route path="/orders/new"   element={<OrderForm />} />
         <Route path="/orders/:id"   element={<OrderDetail />} />

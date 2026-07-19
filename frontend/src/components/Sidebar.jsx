@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, HardDrive, AlertCircle, X, FolderOpen } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, HardDrive, AlertCircle, X, FolderOpen, Fingerprint } from 'lucide-react'
 import { isGoogleSignedIn, signInToGoogle, signOutGoogle, initGoogleAPI } from '../lib/drive'
 import { useState, useEffect } from 'react'
 import { MonitorDown, Moon, Sun } from 'lucide-react'
@@ -8,11 +8,12 @@ import { getOrders } from '../lib/supabase'
 import { getDeadlineAlertOrders } from '../lib/notifications'
 
 const DESIGNER_NAV = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/orders', icon: ClipboardList, label: 'Semua Orderan' },
-  { to: '/orders/new', icon: PlusCircle, label: 'Tambah Orderan' },
-  { to: '/drive', icon: FolderOpen, label: 'Drive Manager' },
-  { to: '/reports', icon: BarChart2, label: 'Laporan' },
+  { to: '/',          icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/absen',     icon: Fingerprint,     label: 'Absen' },
+  { to: '/orders',    icon: ClipboardList,   label: 'Semua Orderan' },
+  { to: '/orders/new',icon: PlusCircle,      label: 'Tambah Orderan' },
+  { to: '/drive',     icon: FolderOpen,      label: 'Drive Manager' },
+  { to: '/reports',   icon: BarChart2,       label: 'Laporan' },
 ]
 
 // Instructions modal for Google Drive setup
