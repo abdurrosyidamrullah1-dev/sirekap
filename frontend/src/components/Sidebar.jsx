@@ -4,7 +4,7 @@ import { LayoutDashboard, ClipboardList, PlusCircle, BarChart2, LogOut, LogIn, H
 import { isGoogleSignedIn, signInToGoogle, signOutGoogle, initGoogleAPI } from '../lib/drive'
 import { useState, useEffect } from 'react'
 import { MonitorDown, Moon, Sun } from 'lucide-react'
-import { getOrders, supabase } from '../lib/supabase'
+import { getOrders } from '../lib/supabase'
 import { getDeadlineAlertOrders } from '../lib/notifications'
 
 const DESIGNER_NAV = [
@@ -120,15 +120,9 @@ export default function Sidebar() {
       }
     }
     fetchAlerts()
-
-    const channel = supabase
-      .channel('public:orders:alerts')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchAlerts)
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    // Poll setiap 2 menit untuk deadline alerts
+    const alertInterval = setInterval(fetchAlerts, 2 * 60 * 1000)
+    return () => clearInterval(alertInterval)
   }, [])
 
   useEffect(() => {
